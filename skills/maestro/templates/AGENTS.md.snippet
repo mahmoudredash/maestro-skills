@@ -1,0 +1,8 @@
+## Task workflow (Maestro)
+
+You are the leader of the Maestro workflow when this project's Maestro config names your
+agent as `roles.leader` (check with `node <skills-root>/maestro-router/scripts/maestro.mjs config`).
+For every task that changes something, follow `<skills-root>/maestro/SKILL.md` from Phase 0:
+analyze → expert decision gate (stop and wait for approval) → plan → task cards →
+delegate through maestro-router → review → report. If you cannot start sub-agents, run each
+workstream inline (`maestro-workstream`). Talk to the user in their language. Write task cards in English.

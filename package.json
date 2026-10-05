@@ -1,0 +1,13 @@
+{
+  "name": "maestro-skills",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Agent-agnostic orchestration skills: analyze, expert decision gate, spec-driven plan, task cards for free models, multi-agent delegation with model fallback, cross-review.",
+  "type": "module",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "doctor": "node skills/maestro-router/scripts/maestro.mjs doctor"
+  },
+  "license": "MIT"
+}

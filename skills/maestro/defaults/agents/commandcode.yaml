@@ -1,0 +1,64 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Agent: Command Code (`cmd`)  (dispatched through delegate-skills' commandcode-delegate)
+#
+# Free models listed by Command Code at the time of writing. Exact ids may carry a
+# vendor prefix on your account — check `cmd --list-models` or `maestro.mjs doctor`.
+#
+# Note: Command Code also offers "jev", a decision model (typed answers with
+# probabilities, no text). It is NOT a coding model, so it is not listed here.
+# It is reserved for a future extension (e.g. task triage / review gating).
+# ─────────────────────────────────────────────────────────────────────────────
+
+agent: commandcode
+enabled: true
+priority: 3
+delegate_skill: commandcode-delegate
+binary: cmd
+list_models_cmd: "cmd --list-models"
+timeout: 45m
+
+relay_flags:
+  model: --model
+  effort: --effort
+effort_map:
+  low: low
+  medium: medium
+  high: high
+  max: high                    # Command Code tops out at high
+
+limit_signals: ["429", "rate limit", "rate_limit", "quota", "usage limit", "too many requests", "daily limit", "credits"]
+limit_scope: model             # each free model here has its own cap
+cooldown_minutes: 120
+
+models:
+  - id: ling-3.1-flash:free
+    provider: commandcode-ling
+    tier: 2
+    good_for: [mechanical, docs, tests, general]
+    status: active
+    fallback_order: 1
+    notes: "Free with no daily request limit — good default for bulk/mechanical cards."
+
+  - id: laguna-s-2.1-free
+    provider: commandcode-laguna
+    tier: 3
+    good_for: [feature, refactor, general]
+    status: active
+    fallback_order: 2
+    notes: "Free while capacity lasts."
+
+  - id: space-bunny-alpha
+    provider: commandcode-alpha
+    tier: 3
+    good_for: [feature, ui, general]
+    status: active
+    fallback_order: 3
+    notes: "Alpha model, no credit cost."
+
+  - id: ling-3.0-flash-sante:free
+    provider: commandcode-ling-sante
+    tier: 2
+    good_for: [mechanical, docs]
+    status: standby
+    fallback_order: 4
+    notes: "Free up to 100 requests/day."

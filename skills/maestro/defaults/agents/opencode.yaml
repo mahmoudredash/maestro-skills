@@ -1,0 +1,98 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Agent: OpenCode  (dispatched through delegate-skills' opencode-delegate)
+#
+# Model list is OPEN: add as many models as you like, from ANY provider OpenCode
+# is logged into (opencode auth login). Free model IDs change often; the defaults
+# below are the well-known OpenCode Zen free models at the time of writing.
+# Run `node <maestro-router>/scripts/maestro.mjs doctor` to verify which exist.
+#
+# Per model:
+#   id             exact value passed to --model (provider/model)
+#   provider       quota bucket; a limit hit on this provider blocks it in every agent
+#   tier           1 (weak/fast) … 5 (strongest). Your estimate — tune it from experience.
+#   good_for       task types it should get: feature, refactor, api, tests, ui, docs,
+#                  mechanical, analysis, review, complex-logic, migration, general
+#   avoid_for      task types it must never get
+#   status         active   → used normally
+#                  standby  → fine, but only used when active models are limited/failing
+#                  disabled → never used
+#   fallback_order tie-breaker inside this agent (1 first)
+# ─────────────────────────────────────────────────────────────────────────────
+
+agent: opencode
+enabled: true
+priority: 1                    # lower = preferred when two agents fit equally
+delegate_skill: opencode-delegate
+binary: opencode
+list_models_cmd: "opencode models"
+default_model: opencode/big-pickle
+timeout: 45m
+
+relay_flags:
+  model: --model
+  effort: --variant            # OpenCode calls reasoning effort "variant"
+effort_map:                    # Maestro effort → OpenCode variant ("" = don't pass one)
+  low: minimal
+  medium: ""
+  high: high
+  max: max
+
+limit_signals: ["429", "rate limit", "rate_limit", "quota", "usage limit", "too many requests", "free tier", "insufficient credits"]
+limit_scope: provider          # provider | model
+cooldown_minutes: 60
+
+models:
+  - id: opencode/big-pickle
+    provider: opencode-zen
+    tier: 4
+    good_for: [feature, refactor, api, complex-logic, general]
+    status: active
+    fallback_order: 1
+    notes: "Zen stealth model built for coding agents; free while in preview."
+
+  - id: opencode/minimax-m2.5-free
+    provider: opencode-zen
+    tier: 4
+    good_for: [feature, tests, refactor, review, general]
+    status: active
+    fallback_order: 2
+    notes: "Strong at coding and agentic tool use."
+
+  - id: opencode/mimo-v2-pro-free
+    provider: opencode-zen
+    tier: 3
+    good_for: [feature, tests, ui, general]
+    status: active
+    fallback_order: 3
+
+  - id: opencode/nemotron-3-super-free
+    provider: opencode-zen
+    tier: 3
+    good_for: [analysis, docs, review, general]
+    status: active
+    fallback_order: 4
+    notes: "Very long context (~1M); good for reading lots of code."
+
+  - id: opencode/gpt-5-nano
+    provider: opencode-zen
+    tier: 1
+    good_for: [mechanical, docs]
+    avoid_for: [complex-logic, migration]
+    status: standby
+    fallback_order: 5
+
+  # ── Examples from other providers (enable after `opencode auth login <provider>`
+  #    and after checking the exact id in `opencode models`) ──
+  - id: google/gemini-flash-latest
+    provider: google
+    tier: 4
+    good_for: [feature, tests, review, general]
+    status: disabled
+    fallback_order: 10
+
+  - id: ollama-cloud/gpt-oss:120b
+    provider: ollama-cloud
+    tier: 4
+    good_for: [feature, review, general]
+    status: disabled
+    fallback_order: 11

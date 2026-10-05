@@ -1,0 +1,125 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Maestro — workflow configuration
+#
+# Where this file lives (first match wins):
+#   <repo>/.maestro/config.yaml    → this project only   (maestro.mjs init --project)
+#   ~/.config/maestro/config.yaml  → all projects        (maestro.mjs init --global)
+#   skills/maestro/defaults/       → shipped defaults (this file)
+#
+# The agents/ folder next to this file holds one file per implementer agent
+# (opencode, pi, commandcode, ...) with its models. Add a new agent by adding a file.
+# ─────────────────────────────────────────────────────────────────────────────
+
+version: 1
+
+# Which profile is active. Switch with one line, or per run: maestro.mjs --profile free-only
+profile: claude-led
+
+# When every eligible free model is rate-limited or failing for a task:
+#   ask            → STOP and ask the user what to do (default)
+#   wait_and_retry → wait for the earliest cooldown to end, then retry automatically
+on_exhaustion: ask
+
+wait_and_retry:
+  max_wait_minutes: 120     # never wait longer than this for one recovery
+  max_cycles: 3             # after this many waits, fall back to "ask"
+
+# How the router picks among free models (see skills/maestro-router/SKILL.md).
+routing:
+  sensitive_min_tier: 4     # sensitive cards (money, auth, security, migrations) need tier >= 4
+  normal_min_tier: 1
+  reviewer_min_tier: 3      # cross-reviewers need at least this tier
+  prefer_cheapest_sufficient: true   # normal work uses the weakest model that qualifies,
+                                     # keeping strong models' quota for work that needs it
+  allow_unfit_fallback: false        # true = models whose good_for doesn't match (and has no
+                                     # "general") may still be tried as a last resort
+
+# What counts as "sensitive" when classifying task cards.
+sensitive_topics:
+  - money / pricing / invoicing / payments
+  - authentication / authorization / permissions
+  - security / secrets / external input handling
+  - DB migrations touching existing data
+  - deleting or rewriting user data
+
+dispatch:
+  max_model_switches: 6     # fallback hops per card before giving up
+  default_timeout: 45m      # per relay run, unless the agent file sets its own
+
+hierarchy:
+  max_depth: 3              # leader → sub_lead → implementer (implementers may nest further inside their own CLI)
+  workstreams: sequential   # v1: sequential. Sub-leads isolate context and save leader tokens.
+
+state:
+  dir: .workflow            # per-task state folders live here, inside the project
+  commit_state: true
+
+verification:               # leave empty to auto-detect from package.json / Makefile / pyproject.toml
+  test: ""
+  lint: ""
+  typecheck: ""
+  build: ""
+
+extensions:
+  dir: extensions           # optional add-on packs (e.g. a future OmniRoute pack); ignored when absent
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Profiles: who plays which role. Effort: low | medium | high | max
+#   agent: claude-code | opencode | pi | commandcode | <any agent file name>
+#   pool:  agents      → pick from the agent files via the router (tier / good_for)
+# ─────────────────────────────────────────────────────────────────────────────
+profiles:
+
+  # Default: Claude Code leads; free models do the implementation and the per-task review.
+  claude-led:
+    roles:
+      leader:
+        agent: claude-code
+        model: opus              # Claude Code alias (opus | sonnet | haiku) or a full model id
+        effort: high
+        used_for: [analysis, business-decisions, planning, task-cards, final-approval, report]
+      sub_lead:
+        agent: claude-code
+        model: haiku             # cheap sub-agent: coordinates one workstream, returns a short summary
+        effort: medium
+        used_for: [workstream-coordination, dispatch, collect-results, diff-scope-check]
+      implementer:
+        pool: agents
+        effort: medium
+        used_for: [implementation, writing-tests]
+      reviewer:
+        pool: agents
+        min_tier: 3
+        effort: high
+        used_for: [per-task-cross-review, test-verification]
+      final_reviewer:
+        agent: claude-code
+        model: sonnet
+        effort: high
+        used_for: [final-review, security-review-on-sensitive]
+
+  # No Claude at all: a strong free model leads through its own CLI.
+  free-only:
+    roles:
+      leader:
+        agent: opencode
+        model: opencode/big-pickle
+        effort: high
+        used_for: [analysis, business-decisions, planning, task-cards, final-approval, report]
+      sub_lead:
+        agent: none              # no sub-agents: the leader runs workstreams inline, one by one
+        used_for: [workstream-coordination]
+      implementer:
+        pool: agents
+        effort: medium
+        used_for: [implementation, writing-tests]
+      reviewer:
+        pool: agents
+        min_tier: 3
+        effort: high
+        used_for: [per-task-cross-review, test-verification]
+      final_reviewer:
+        pool: agents
+        min_tier: 4
+        effort: max
+        used_for: [final-review]
