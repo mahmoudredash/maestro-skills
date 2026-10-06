@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.0 — extension packs + OmniRoute
+- Router: skills that ship `maestro-agents/*.yaml` are discovered as extension packs (overridable from the config dir, `extensions.disabled` to turn off).
+- Router: per-agent `preflight` hook (0 ok · 3 fallback-only · else skip + `agent:<name>` cooldown); per-model `roles` and `sensitive_ok`.
+- New optional pack `maestro-omniroute`: OpenCode through a local OmniRoute gateway, health + strict-free-policy preflight, safe compression, `setup` / `check` / `attest-strict`.
+
 ## 1.0.0 — core
 - `maestro` orchestrator: analysis → expert decision gate → plan (speckit) → task cards → workstreams → review → report, with resumable state in `.workflow/`.
 - `maestro-decisions`, `maestro-breakdown`, `maestro-workstream`, `maestro-review`.

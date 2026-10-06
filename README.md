@@ -166,12 +166,22 @@ same question is never asked twice.
 
 ---
 
-## Extensions
-The core **depends on no extension**. Extensions live in the `extensions/` folder; planned ones:
-- **OmniRoute:** a provider layer underneath the agents.
-- **Decision engine:** for example Command Code's *jev* model.
+## Extension packs (optional)
+The core **depends on no extension**. A pack is a skill that ships extra agent files
+(`maestro-agents/`); the router picks it up automatically once installed.
 
-Details in `extensions/README.md`.
+| Pack | What it adds |
+|---|---|
+| `maestro-omniroute` | OpenCode through a local [OmniRoute](https://github.com/diegosouzapw/OmniRoute) gateway as an extra free-model source: health-checked before each dispatch, paid fall-through guarded (strict free policy), safe compression. See `skills/maestro-omniroute/SKILL.md`. |
+
+```bash
+./install.sh --with omniroute                     # or: npx skills add mahmoudredash/maestro-skills (pick maestro-omniroute)
+node ~/.claude/skills/maestro-omniroute/scripts/omniroute.mjs setup
+node ~/.claude/skills/maestro-omniroute/scripts/omniroute.mjs check
+```
+
+Turn a pack off without uninstalling: `extensions: { disabled: [maestro-omniroute] }` in `config.yaml`.
+Planned: a decision-engine pack (e.g. Command Code's *jev*). Details in `extensions/README.md`.
 
 ## Development
 ```bash

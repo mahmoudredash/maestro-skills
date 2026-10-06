@@ -53,7 +53,8 @@ If a companion is missing, say so once, give its install command (see README), a
 fallback this file describes. Never stall.
 
 ## Extensions (optional)
-The core depends on no extension. If `<skills-root>/../extensions/*/EXTENSION.md` or
+The core depends on no extension. Installed packs that ship `maestro-agents/` (for example
+`maestro-omniroute`) are picked up by the router automatically; `$MR config` lists them. If `<skills-root>/../extensions/*/EXTENSION.md` or
 `<config-dir>/extensions/*/EXTENSION.md` exists, read it: it says which phase it hooks into.
 Otherwise ignore extensions entirely.
 

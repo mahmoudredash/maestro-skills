@@ -185,13 +185,14 @@ test("dispatch: dry run returns the chain without calling any relay", () => {
   assert.equal(r.summary.chain[0].ref, "alpha:zen/mid");
 });
 
-test("shipped defaults load through loadConfig with the claude-led profile", () => {
-  const { config, agents } = loadConfig({ configDir: join(HERE, "..", "skills/maestro/defaults") });
+test("shipped defaults load through loadConfig with the claude-led profile (core only, no packs)", () => {
+  const noPacks = mkdtempSync(join(tmpdir(), "maestro-skills-root-"));
+  const { config, agents } = loadConfig({ configDir: join(HERE, "..", "skills/maestro/defaults"), skillsRoot: noPacks });
   assert.equal(config.activeProfile, "claude-led");
   assert.equal(config.on_exhaustion, "ask");
   assert.equal(config.roles.leader.agent, "claude-code");
   assert.deepEqual(agents.map((a) => a.agent).sort(), ["commandcode", "opencode", "pi"]);
-  const free = loadConfig({ configDir: join(HERE, "..", "skills/maestro/defaults"), profile: "free-only" });
+  const free = loadConfig({ configDir: join(HERE, "..", "skills/maestro/defaults"), profile: "free-only", skillsRoot: noPacks });
   assert.equal(free.config.roles.leader.agent, "opencode");
 });
 

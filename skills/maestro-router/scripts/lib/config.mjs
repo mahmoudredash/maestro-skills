@@ -7,6 +7,10 @@
 //   3. <git-root>/.maestro                (project scope)
 //   4. ~/.config/maestro                  (global scope; $XDG_CONFIG_HOME respected)
 //   5. <skills-root>/maestro/defaults     (shipped defaults)
+//
+// Extension packs: any installed skill that ships a `maestro-agents/` folder (e.g.
+// maestro-omniroute) adds its agent files on top. An agent defined in the config dir with
+// the same `agent` name wins; `extensions.disabled: [<skill name>]` turns a pack off.
 
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
@@ -72,6 +76,9 @@ export function loadConfig(opts = {}) {
   config.roles = profile?.roles ?? config.roles ?? {};
 
   const agents = agentsHit ? loadAgents(join(agentsHit.dir, "agents")) : [];
+  const packs = loadPackAgents(opts.skillsRoot ?? SKILLS_ROOT, config.extensions?.disabled ?? []);
+  const known = new Set(agents.map((a) => a.agent));
+  for (const a of packs.agents) if (!known.has(a.agent)) agents.push(a);
   return {
     config,
     agents,
@@ -80,8 +87,31 @@ export function loadConfig(opts = {}) {
       configScope: cfgHit?.scope ?? "builtin",
       agents: agentsHit ? join(agentsHit.dir, "agents") : null,
       agentsScope: agentsHit?.scope ?? null,
+      packs: packs.names,
     },
   };
+}
+
+/** Agent files shipped by installed extension packs: <skills-root>/<skill>/maestro-agents/*.yaml */
+export function loadPackAgents(skillsRoot, disabled = []) {
+  const out = { agents: [], names: [] };
+  let entries = [];
+  try {
+    entries = readdirSync(skillsRoot, { withFileTypes: true });
+  } catch {
+    return out;
+  }
+  for (const e of entries.sort((x, y) => x.name.localeCompare(y.name))) {
+    if (!(e.isDirectory() || e.isSymbolicLink()) || disabled.includes(e.name)) continue;
+    const dir = join(skillsRoot, e.name, "maestro-agents");
+    if (!existsSync(dir)) continue;
+    const found = loadAgents(dir).map((a) => ({ ...a, pack: e.name }));
+    if (found.length) {
+      out.agents.push(...found);
+      out.names.push(e.name);
+    }
+  }
+  return out;
 }
 
 function yamlFiles(dir) {
@@ -116,6 +146,8 @@ export function normalizeAgent(a, file = "(inline)") {
       avoid_for: m.avoid_for ?? [],
       status: m.status ?? "active",
       fallback_order: Number(m.fallback_order ?? i + 1),
+      roles: m.roles ?? null,                   // e.g. [implementer]: never used for other roles
+      sensitive_ok: m.sensitive_ok !== false,   // false: never used for sensitive cards
       notes: m.notes ?? "",
     };
   });
@@ -136,8 +168,20 @@ export function normalizeAgent(a, file = "(inline)") {
     ),
     limit_scope: a.limit_scope ?? "provider",
     cooldown_minutes: Number(a.cooldown_minutes ?? 60),
+    preflight: normalizePreflight(a.preflight),
     models,
   };
+}
+
+// Optional health check run once per dispatch before an agent's models are tried.
+// Exit 0 = available, 3 = available only as fallback (models treated as standby),
+// anything else = unavailable (agent skipped and cooled down for `cooldown_minutes`).
+// Placeholders: {node} = this Node binary, {skills_root} = installed skills folder.
+function normalizePreflight(p) {
+  if (!p) return null;
+  const o = typeof p === "string" ? { cmd: p } : p;
+  if (!o.cmd) return null;
+  return { cmd: String(o.cmd), cooldown_minutes: Number(o.cooldown_minutes ?? 10), timeout_seconds: Number(o.timeout_seconds ?? 10) };
 }
 
 export function deepMerge(base, over) {

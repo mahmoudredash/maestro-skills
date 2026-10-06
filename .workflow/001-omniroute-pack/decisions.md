@@ -1,6 +1,6 @@
 # Decisions — 001 OmniRoute pack
 
-Status: WAITING ON USER
+Status: ANSWERED (2026-10-06)
 
 ## D1 — Where does OmniRoute sit in the model pool?
 Expert role: Platform architect
@@ -65,4 +65,4 @@ Recommendation A: cards depend on exact names and numbers; lossy compression ris
 - Core change limited to the generic `preflight` hook (+ tests); no OmniRoute-specific code in core.
 
 ## User answers
-_pending_
+D1–D6: APPROVED (recommended options). Assumptions: accepted.

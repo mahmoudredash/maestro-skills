@@ -45,8 +45,22 @@ To add a model, add an entry. To add an agent CLI, add a file whose `delegate_sk
 of the delegate-skills relays (`pi-delegate`, `commandcode-delegate`, `codex-delegate`,
 `kimi-delegate`, …). Then run `$MR doctor`.
 
+Optional fields:
+- Per model:
+  - `roles: [implementer]` restricts which roles may use the model.
+  - `sensitive_ok: false` keeps the model off sensitive cards.
+- Per agent:
+  - `preflight: { cmd, cooldown_minutes, timeout_seconds }` runs once per dispatch before any of the agent's models is tried. Exit `0` means ok. Exit `3` means the agent's models are used as fallback only. Any other exit means the agent is skipped and cooled down (`agent:<name>` in `limits`).
+  - Placeholders in `cmd`: `{node}`, `{skills_root}`.
+
+### Extension packs
+An installed skill that ships `maestro-agents/*.yaml` adds those agents automatically. One example
+is `maestro-omniroute`. A file in your config `agents/` folder with the same `agent` name replaces
+the pack's. To turn a pack off: `extensions: { disabled: [<skill name>] }` in `config.yaml`.
+`$MR doctor` lists the packs and each preflight result.
+
 ## How a model is chosen
-1. **Filters:** the agent is enabled; the model is not `disabled`; the model is not cooling down from a limit; the card's type is not in `avoid_for`; the type is in `good_for` (or `good_for` includes `general`); `tier` ≥ the floor; the provider or model is not excluded.
+1. **Filters:** the agent is enabled and passed its preflight; the model is not `disabled`; the model is not cooling down from a limit; `roles` / `sensitive_ok` allow this use; the card's type is not in `avoid_for`; the type is in `good_for` (or `good_for` includes `general`); `tier` ≥ the floor; the provider or model is not excluded.
    - The tier floor is `routing.sensitive_min_tier` for sensitive cards and `reviewer_min_tier` for reviewers, or the role's own `min_tier`.
 2. **Order:** `active` before `standby`; exact `good_for` before `general`. Then:
    - **sensitive → the strongest tier first.**

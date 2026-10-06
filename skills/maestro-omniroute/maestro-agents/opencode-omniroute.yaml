@@ -1,0 +1,83 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Pack agent: OpenCode → OmniRoute  (installed with the maestro-omniroute skill)
+#
+# Same OpenCode CLI and relay as the core `opencode` agent, but the models are served
+# by a local OmniRoute gateway (provider "omniroute" in opencode.json — create it with
+# `node <skills-root>/maestro-omniroute/scripts/omniroute.mjs setup`).
+#
+# To customise: copy this file into your config agents folder (~/.config/maestro/agents
+# or <repo>/.maestro/agents). A file there with the same `agent` name replaces this one.
+# To disable the pack: `extensions: { disabled: [maestro-omniroute] }` in config.yaml.
+# ─────────────────────────────────────────────────────────────────────────────
+
+agent: opencode-omniroute
+enabled: true
+priority: 2
+delegate_skill: opencode-delegate
+binary: opencode
+list_models_cmd: "opencode models"
+timeout: 45m
+
+# Health + cost guard, once per dispatch (exit 0 ok · 3 fallback-only · else down).
+preflight:
+  cmd: "{node} {skills_root}/maestro-omniroute/scripts/omniroute.mjs preflight"
+  cooldown_minutes: 10
+  timeout_seconds: 10
+
+relay_flags:
+  model: --model
+  effort: --variant
+effort_map:
+  low: minimal
+  medium: ""
+  high: high
+  max: max
+
+# OmniRoute already fails over internally; a limit error from it means it is out of
+# options for now, so cool the whole gateway down briefly.
+limit_signals: ["429", "rate limit", "rate_limit", "quota", "usage limit", "too many requests", "no available", "all providers", "circuit open", "exhausted"]
+limit_scope: provider
+cooldown_minutes: 10
+
+models:
+  # Auto combos: OmniRoute picks the real model, so Maestro cannot know which one ran.
+  # Per decision D3 they are implementer-only and never used for sensitive cards.
+  - id: omniroute/auto/coding:free
+    provider: omniroute
+    tier: 3
+    good_for: [feature, refactor, tests, api, ui, general]
+    roles: [implementer]
+    sensitive_ok: false
+    status: active
+    fallback_order: 1
+    notes: "Coding pool, free tier only (fail-open unless the strict free policy is on)."
+
+  - id: omniroute/auto/offline
+    provider: omniroute
+    tier: 2
+    good_for: [mechanical, docs]
+    roles: [implementer]
+    sensitive_ok: false
+    status: active
+    fallback_order: 2
+    notes: "Favors providers with the most quota headroom."
+
+  - id: omniroute/auto/fast
+    provider: omniroute
+    tier: 2
+    good_for: [mechanical, docs, tests]
+    roles: [implementer]
+    sensitive_ok: false
+    status: standby
+    fallback_order: 3
+
+  # Pinned models (an explicit upstream model through OmniRoute) are traceable, so they
+  # may review and take sensitive cards. Use the upstream provider as `provider` so limits
+  # and cross-review exclusion line up with the direct agents. Example (enable after
+  # checking the id with `omniroute.mjs check`):
+  - id: omniroute/gemini/gemini-2.5-pro
+    provider: google
+    tier: 4
+    good_for: [feature, complex-logic, review, general]
+    status: disabled
+    fallback_order: 10

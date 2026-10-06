@@ -35,7 +35,7 @@ export function limitKey(agent, model) {
 /** Returns the active limit entry for agent/model, or null. Checks both scopes so a
  *  provider-wide limit recorded via one agent also blocks the same provider in another. */
 export function activeLimit(agent, model, limits, now = Date.now()) {
-  for (const key of [`provider:${model.provider}`, `model:${agent.agent}:${model.id}`]) {
+  for (const key of [`provider:${model.provider}`, `model:${agent.agent}:${model.id}`, `agent:${agent.agent}`]) {
     const e = limits[key];
     if (e && Date.parse(e.until) > now) return { key, ...e };
   }
@@ -47,6 +47,16 @@ export function markLimited(agent, model, reason, { now = Date.now(), path } = {
   const key = limitKey(agent, model);
   const until = new Date(now + agent.cooldown_minutes * 60_000).toISOString();
   limits[key] = { until, reason: String(reason).slice(0, 300), at: new Date(now).toISOString(), via: `${agent.agent}:${model.id}` };
+  writeLimits(limits, path);
+  return { key, until };
+}
+
+/** Cools down a whole agent (e.g. its backend failed a preflight health check). */
+export function markAgentDown(agent, minutes, reason, { now = Date.now(), path } = {}) {
+  const limits = readLimits(path);
+  const key = `agent:${agent.agent}`;
+  const until = new Date(now + minutes * 60_000).toISOString();
+  limits[key] = { until, reason: String(reason).slice(0, 300), at: new Date(now).toISOString(), via: agent.agent };
   writeLimits(limits, path);
   return { key, until };
 }
