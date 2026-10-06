@@ -234,7 +234,9 @@ const quick = (cooldown) => {
   b.cooldown_minutes = cooldown;
   return [a, b];
 };
-const allLimited = { "zen/mid": "limited", "other-strong": "limited", backup: "limited" };
+// Every model limited, including zen/strong: with very short test cooldowns a slow runner can
+// see the zen provider cooldown expire mid-run, so no model may be left "completed".
+const allLimited = { "zen/mid": "limited", "zen/strong": "limited", "other-strong": "limited", backup: "limited" };
 
 test("wait_and_retry (defer, default): returns retry_later at once with the next cycle", () => {
   const started = Date.now();
