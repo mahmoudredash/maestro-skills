@@ -114,7 +114,7 @@ function repo() {
   return dir;
 }
 
-function run(outcomes, extra = {}, agents = [alpha(), beta()]) {
+function run(outcomes, extra = {}, agents = [alpha(), beta()], configOver = {}) {
   const cd = repo();
   const calls = join(cd, "..", `calls-${Date.now()}-${Math.random()}.jsonl`);
   process.env.MAESTRO_FAKE_RELAY = FAKE_RELAY;
@@ -122,7 +122,7 @@ function run(outcomes, extra = {}, agents = [alpha(), beta()]) {
   process.env.FAKE_CALLS = calls;
   const brief = join(cd, "..", "card.md");
   writeFileSync(brief, "# card\n");
-  const config = { routing, on_exhaustion: "ask", wait_and_retry: { max_wait_minutes: 1, max_cycles: 1 }, dispatch: { max_model_switches: 6 }, roles: { implementer: { effort: "medium" } } };
+  const config = { routing, on_exhaustion: "ask", wait_and_retry: { max_wait_minutes: 1, max_cycles: 1 }, dispatch: { max_model_switches: 6 }, roles: { implementer: { effort: "medium" } }, ...configOver };
   const res = dispatch({ brief, cd, out: join(cd, "..", `out-${Math.random()}`), type: "feature", sensitivity: "normal", role: "implementer", config, agentsList: agents, log: () => {}, ...extra });
   const lines = existsSync(calls) ? readFileSync(calls, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l)) : [];
   return { ...res, order: lines.map((l) => l.model), argvs: lines.map((l) => l.argv), cd };
@@ -222,4 +222,42 @@ test("dispatch: files in the .workflow state folder never count as a dirty tree 
   assert.equal(res.summary.status, "completed");
   assert.ok(existsSync(join(cd, ".workflow", "001-x", "status.md")), "state file must survive the stash");
   assert.ok(!existsSync(join(cd, "partial.txt")), "partial work must be stashed");
+});
+
+// ── on_exhaustion: wait_and_retry ──
+
+const quick = (cooldown) => {
+  const a = alpha();
+  const b = beta();
+  a.cooldown_minutes = cooldown;
+  b.cooldown_minutes = cooldown;
+  return [a, b];
+};
+const allLimited = { "zen/mid": "limited", "other-strong": "limited", backup: "limited" };
+
+test("wait_and_retry (defer, default): returns retry_later at once with the next cycle", () => {
+  const started = Date.now();
+  const r = run(allLimited, {}, quick(2), { on_exhaustion: "wait_and_retry", wait_and_retry: { max_wait_minutes: 5, max_cycles: 2 } });
+  assert.equal(r.code, 6);
+  assert.equal(r.summary.status, "retry_later");
+  assert.equal(r.summary.nextCycle, 1);
+  assert.ok(r.summary.retryAfter);
+  assert.ok(Date.now() - started < 5000, "defer mode must not sleep");
+});
+
+test("wait_and_retry: cycles used up → exhausted", () => {
+  const r = run(allLimited, { cycle: 2 }, quick(2), { on_exhaustion: "wait_and_retry", wait_and_retry: { max_wait_minutes: 5, max_cycles: 2 } });
+  assert.equal(r.code, 4);
+  assert.equal(r.summary.status, "exhausted");
+});
+
+test("wait_and_retry: a wait longer than max_wait_minutes → exhausted", () => {
+  const r = run(allLimited, {}, quick(60), { on_exhaustion: "wait_and_retry", wait_and_retry: { max_wait_minutes: 5, max_cycles: 2 } });
+  assert.equal(r.summary.status, "exhausted");
+});
+
+test("wait_and_retry (inline): sleeps, retries the chain, then gives up after max_cycles", () => {
+  const r = run(allLimited, {}, quick(0.01), { on_exhaustion: "wait_and_retry", wait_and_retry: { max_wait_minutes: 1, max_cycles: 1, mode: "inline" } });
+  assert.equal(r.summary.status, "exhausted");
+  assert.ok(r.order.filter((m) => m === "zen/mid").length === 2, `expected a second pass after the wait, got ${r.order}`);
 });

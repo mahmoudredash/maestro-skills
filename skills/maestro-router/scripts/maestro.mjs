@@ -4,7 +4,8 @@
 //   maestro.mjs route    --type <t> [--sensitivity normal|sensitive] [--role implementer|reviewer] [--exclude-provider p]...
 //   maestro.mjs dispatch --brief <card.md> --out <dir> [--type t] [--sensitivity s] [--role r] [--read-only]
 //                        [--exclude-provider p]... [--exclude-model m]... [--agent a]... [--pin agent:model]
-//                        [--session id] [--effort e] [--no-wait] [--allow-dirty] [--dry-run] [--cd repo]
+//                        [--session id] [--effort e] [--no-wait] [--cycle n] [--allow-dirty] [--dry-run] [--cd repo]
+//   maestro.mjs wait     --until <ISO time> [--max-minutes n]   (sleep until a cooldown ends; run in background)
 //   maestro.mjs doctor   [--json]
 //   maestro.mjs limits   [show | clear [key]]
 //   maestro.mjs init     --global | --project [--force]
@@ -18,7 +19,7 @@ import { spawnSync } from "node:child_process";
 import { loadConfig, DEFAULTS_DIR, gitRoot, globalConfigDir } from "./lib/config.mjs";
 import { readLimits, clearLimits, limitsPath } from "./lib/limits.mjs";
 import { rankCandidates } from "./lib/route.mjs";
-import { dispatch, findRelay, EXIT } from "./lib/dispatch.mjs";
+import { dispatch, findRelay, sleep, EXIT } from "./lib/dispatch.mjs";
 
 const MULTI = new Set(["exclude-provider", "exclude-model", "agent"]);
 const BOOL = new Set(["read-only", "no-wait", "allow-dirty", "dry-run", "json", "global", "project", "force", "help"]);
@@ -56,7 +57,7 @@ if (!cmd || cmd === "help" || args.help) {
 
 function readHeader() {
   return `Maestro router — see skills/maestro-router/SKILL.md
-Commands: route | dispatch | doctor | limits | init | config
+Commands: route | dispatch | wait | doctor | limits | init | config
 `;
 }
 
@@ -118,6 +119,7 @@ switch (cmd) {
       session: args.session,
       effort: args.effort,
       wait: !args["no-wait"],
+      cycle: args.cycle !== undefined ? Number(args.cycle) : 0,
       allowDirty: !!args["allow-dirty"],
       dryRun: !!args["dry-run"],
       config,
@@ -125,6 +127,20 @@ switch (cmd) {
     });
     print(summary);
     process.exit(code);
+  }
+
+  case "wait": {
+    if (!args.until) die("--until <ISO time> is required (the retryAfter value from dispatch)");
+    const until = Date.parse(args.until);
+    if (Number.isNaN(until)) die(`not a valid time: ${args.until}`);
+    const { config } = load();
+    const maxMin = Number(args["max-minutes"] ?? config.wait_and_retry?.max_wait_minutes ?? 120);
+    const ms = Math.max(0, until - Date.now());
+    if (ms > maxMin * 60_000) die(`refusing to wait ${Math.ceil(ms / 60000)} min (> ${maxMin} min limit)`, EXIT.EXHAUSTED);
+    const started = Date.now();
+    sleep(ms);
+    print({ status: "ready", until: new Date(until).toISOString(), waitedMinutes: Math.round((Date.now() - started) / 6000) / 10 });
+    break;
   }
 
   case "limits": {

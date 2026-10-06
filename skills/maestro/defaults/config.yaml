@@ -23,6 +23,10 @@ on_exhaustion: ask
 wait_and_retry:
   max_wait_minutes: 120     # never wait longer than this for one recovery
   max_cycles: 3             # after this many waits, fall back to "ask"
+  mode: defer               # defer  → dispatch returns "retry_later" at once; the caller runs
+                            #          `maestro.mjs wait --until <retryAfter>` in the background,
+                            #          then re-dispatches (safe with agent command time limits)
+                            # inline → dispatch itself sleeps (plain shells / CI only)
 
 # How the router picks among free models (see skills/maestro-router/SKILL.md).
 routing:

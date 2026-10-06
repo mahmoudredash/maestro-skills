@@ -89,11 +89,19 @@ What dispatch does:
 | 0 | `completed` | Review it (`maestro-review`). `model`, `provider`, `sessionId`, `resultPath`, and `touchedFiles` are included. |
 | 3 | `failed` | Every candidate failed for real reasons. Read `attempts[].detail`, then rewrite the card or escalate. |
 | 4 | `exhausted` | Every candidate is limited. Apply `on_exhaustion` (below). |
+| 6 | `retry_later` | `wait_and_retry` is on: wait until `retryAfter`, then re-dispatch with `--cycle <nextCycle>` (below). |
 | 5 | `stopped` / `no_candidates` | Fix the precondition (dirty tree, a config that excludes every model). |
 
 ## on_exhaustion
 - `ask` (**default**): the router returns `exhausted` right away, with `retryAfter`. The leader must STOP and ask the user, with options: wait until `retryAfter`, enable a `standby` or `disabled` model, add a model or agent, or have the leader do the card.
-- `wait_and_retry`: the router itself sleeps until the earliest cooldown ends (up to `wait_and_retry.max_wait_minutes`) and retries, at most `max_cycles` times. After that it returns `exhausted`, which you treat like `ask`.
+- `wait_and_retry`: waits for the earliest cooldown to end (at most `max_wait_minutes` per wait, at most `max_cycles` waits), then retries. When the wait would be longer, or the cycles are used up, it returns `exhausted`, which you treat like `ask`.
+  - `mode: defer` (**default**): dispatch returns `retry_later` (exit 6) immediately with `retryAfter` and `nextCycle`. Then:
+    ```bash
+    $MR wait --until <retryAfter>        # run in the BACKGROUND; give it a timeout ≥ waitMinutes + 5
+    $MR dispatch <same arguments> --cycle <nextCycle>
+    ```
+    Agent shells cap how long one command may run (Claude Code: 10 min in the foreground, up to 2 h in the background), so a dispatch must never sleep for hours itself. If your agent can schedule a wake-up instead (for example `ScheduleWakeup` or `send_later`), you may use that rather than `wait`.
+  - `mode: inline`: dispatch sleeps by itself and retries. Use it only in plain shells or CI with no command time limit.
 
 ## Limits and health
 ```bash
