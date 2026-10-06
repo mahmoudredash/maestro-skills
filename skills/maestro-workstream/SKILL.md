@@ -25,6 +25,7 @@ cards are the contract.
    ```
    Read the printed JSON (`dispatch.json`). Act on it:
    - `exhausted` → stop the workstream and report it (see "Return").
+   - `retry_later` → run `$MR wait --until <retryAfter>` in the background (timeout ≥ `waitMinutes` + 5 min), then repeat this same dispatch with `--cycle <nextCycle>`. Do not report this to the leader unless it ends in `exhausted`.
    - `failed` or `stopped` → stop the workstream and report it.
    - `completed` → continue with step 3.
 3. **Check it** (`maestro-review`, "Per-card review"):

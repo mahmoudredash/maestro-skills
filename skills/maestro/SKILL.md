@@ -128,7 +128,7 @@ Sub-leads dispatch each card with `$MR dispatch` (implementer role), run the che
 ### Phase 6: Exhaustion and escalations
 When a sub-lead reports `exhausted` (every eligible free model is limited or failing), apply `on_exhaustion`:
 - `ask` (default): STOP. Tell the user which cards are blocked, which models are cooling down and until when (`$MR limits show`), and the options: wait, enable a standby or disabled model, add a model to an agent file, or have the leader implement it. Wait for the answer.
-- `wait_and_retry`: the router already waited, up to `max_wait_minutes` × `max_cycles`. If it still reports `exhausted`, treat it as `ask`.
+- `wait_and_retry`: sub-leads handle the `retry_later` waits themselves (see `maestro-router`). A sub-lead reports `exhausted` only after `max_cycles` waits, or when a wait would exceed `max_wait_minutes`; treat it as `ask`.
 
 A card marked **TAKEOVER** by review (it failed repeatedly across models) also comes back
 to you. Fix it yourself only if it is small. Otherwise, rewrite the card more explicitly and re-dispatch it.

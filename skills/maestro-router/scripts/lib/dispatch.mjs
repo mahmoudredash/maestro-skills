@@ -9,7 +9,7 @@ import { SKILLS_ROOT, gitRoot } from "./config.mjs";
 import { readLimits, markLimited, looksLimited } from "./limits.mjs";
 import { rankCandidates, earliestRecovery } from "./route.mjs";
 
-export const EXIT = { OK: 0, USAGE: 2, FAILED: 3, EXHAUSTED: 4, STOPPED: 5 };
+export const EXIT = { OK: 0, USAGE: 2, FAILED: 3, EXHAUSTED: 4, STOPPED: 5, RETRY_LATER: 6 };
 
 export function relaySearchDirs(cwd = process.cwd()) {
   const root = gitRoot(cwd);
@@ -70,11 +70,22 @@ function porcelain(cwd, stateDir = ".workflow") {
   }
 }
 
-const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+export const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+
+// `git stash` creates a commit and needs an identity; fall back to a neutral one when the
+// machine has none configured (fresh CI runners, containers) instead of failing the dispatch.
+function hasIdentity(cwd) {
+  try {
+    return git(cwd, ["config", "user.email"]).trim() !== "";
+  } catch {
+    return false;
+  }
+}
 
 /**
  * opts: { brief, cd, out, type, sensitivity, role, readOnly, excludeProviders, excludeModels,
- *         agents (filter), pin ("agent:model"), session, effort, wait (bool), dryRun, config, agentsList, log }
+ *         agents (filter), pin ("agent:model"), session, effort, wait (bool), cycle (waits already done),
+ *         dryRun, config, agentsList, log }
  */
 export function dispatch(opts) {
   const { config, agentsList } = opts;
@@ -102,7 +113,7 @@ export function dispatch(opts) {
   const war = config.wait_and_retry ?? {};
   const attempts = [];
   const unavailableAgents = new Set(); // CLI missing / relay missing: skip the agent's other models
-  let cycles = 0;
+  let cycles = Number(opts.cycle ?? 0);
 
   if (!opts.readOnly && !opts.dryRun && !opts.allowDirty) {
     const st = porcelain(cd, stateDir);
@@ -206,7 +217,8 @@ export function dispatch(opts) {
         const st = porcelain(cd, stateDir);
         if (st) {
           try {
-            git(cd, ["stash", "push", "--include-untracked", "-m", `maestro: partial attempt by ${c.ref}`, ...workPathspec(stateDir)]);
+            const id = hasIdentity(cd) ? [] : ["-c", "user.name=maestro", "-c", "user.email=maestro@localhost"];
+            git(cd, [...id, "stash", "push", "--include-untracked", "-m", `maestro: partial attempt by ${c.ref}`, ...workPathspec(stateDir)]);
             attempts[attempts.length - 1].stashed = true;
             log(`maestro: stashed partial edits from ${c.ref} (git stash list)`);
           } catch (e) {
@@ -231,13 +243,30 @@ export function dispatch(opts) {
       return finish(out, { status: "failed", reason: "every candidate failed for non-limit reasons", attempts }, EXIT.FAILED);
     }
     if (policy === "wait_and_retry" && opts.wait !== false && retryAfter && cycles < (war.max_cycles ?? 3)) {
-      const waitMs = Date.parse(retryAfter) - Date.now() + 5_000;
+      const waitMs = Math.max(0, Date.parse(retryAfter) - Date.now() + 5_000);
       if (waitMs <= (war.max_wait_minutes ?? 120) * 60_000) {
-        cycles++;
-        log(`maestro: all candidates limited; waiting ${Math.ceil(waitMs / 60000)} min (cycle ${cycles}) per on_exhaustion=wait_and_retry`);
-        sleep(Math.max(0, waitMs));
-        attempts.length = 0;
-        continue;
+        if ((war.mode ?? "defer") === "inline") {
+          // Blocks this process; only for plain shells/CI with no command time limit.
+          cycles++;
+          log(`maestro: all candidates limited; waiting ${Math.ceil(waitMs / 60000)} min (cycle ${cycles}) per on_exhaustion=wait_and_retry`);
+          sleep(waitMs);
+          attempts.length = 0;
+          continue;
+        }
+        // defer (default): return right away so no agent command runs for hours. The caller
+        // waits with `maestro.mjs wait --until <retryAfter>` (in the background) and then
+        // re-runs the same dispatch with --cycle <nextCycle>.
+        return finish(out, {
+          status: "retry_later",
+          policy,
+          retryAfter,
+          waitMinutes: Math.ceil(waitMs / 60000),
+          cycle: cycles,
+          nextCycle: cycles + 1,
+          maxCycles: war.max_cycles ?? 3,
+          action: `run "maestro.mjs wait --until ${retryAfter}" (in the background, timeout >= ${Math.ceil(waitMs / 60000) + 5} min), then re-run this dispatch with --cycle ${cycles + 1}`,
+          attempts,
+        }, EXIT.RETRY_LATER);
       }
     }
     return finish(out, {

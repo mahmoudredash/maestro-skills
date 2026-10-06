@@ -1,0 +1,35 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [18, 20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Unit tests
+        run: npm test
+      - name: Shipped defaults load and route
+        run: |
+          node skills/maestro-router/scripts/maestro.mjs config --config-dir skills/maestro/defaults > /dev/null
+          node skills/maestro-router/scripts/maestro.mjs route --type feature --sensitivity sensitive --config-dir skills/maestro/defaults
+      - name: No non-English text in the repository
+        run: |
+          if grep -rnP '[\x{0600}-\x{06FF}]' --exclude-dir=.git .; then
+            echo "::error::Non-English (Arabic) text found; skill files must be English-only to save tokens"
+            exit 1
+          fi
