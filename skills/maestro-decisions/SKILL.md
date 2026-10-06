@@ -49,7 +49,7 @@ Present everything in **one message**, in the user's language:
 2. Decisions D1…Dn, each with options A/B/C and ⭐ on the recommendation.
 3. Assumptions the user can veto.
 4. A plan outline (5–10 lines) that assumes the recommended options.
-5. A reply hint, for example: «رد بـ "موافق" على كل التوصيات، أو مثلاً: D1=B, D3=C».
+5. A reply hint (in the user's language), for example: `Reply "approve" to accept all recommendations, or e.g. D1=B, D3=C`.
 
 If your agent has a structured question tool (for example `AskUserQuestion` in Claude
 Code), you may use it **in addition to** the written analysis, never instead of it.
@@ -58,7 +58,7 @@ Save everything to `decisions.md`, set `status.md` to "2-Decisions (WAITING ON U
 **end your turn**. Do not keep working in the meantime.
 
 ## 5. After the answer
-- Record each answer: `APPROVED`, `CHANGED → B`, `DEFERRED`, or `CUSTOM: …`. «موافق» / "ok" / "approve all" means every recommendation is approved.
+- Record each answer: `APPROVED`, `CHANGED → B`, `DEFERRED`, or `CUSTOM: …`. "ok" / "approve" / "approve all" (or the equivalent in the user's language) means every recommendation is approved.
 - Raise only the new conflicts, briefly.
 - Append the durable business rules to the project's `docs/business-rules.md` (create it if needed), so the same question is never asked twice in future tasks. Before asking anything in Phase 2, check that file.
 - Continue with maestro Phase 3 in the same turn.
