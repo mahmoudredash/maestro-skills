@@ -148,9 +148,12 @@ In the user's language, report:
 Then commit the state folder (if `state.commit_state`) and push, following the repo's git rules.
 
 ## Hard rules
-- Never skip the decisions gate when a real business or domain decision exists.
+- Never skip the decisions gate when a real business or domain decision exists. **Unanswered is not approved**: never apply an option the user did not choose, configuration choices included (see `maestro-decisions`).
+- **Never bypass the router.** If a dispatch fails for infrastructure reasons (a CLI hangs, a relay preflight times out, the machine is overloaded), do not run the agent CLI directly instead. A direct run loses the read-only enforcement, the limit tracking, and the logs. Retry through the router later (`$MR dispatch ...` again, or wait for `retry_later`), or report the blocker and ask.
+- **The project's own tracker stays the source of truth.** If the project already tracks tasks and decisions (Spec Kit `tasks.md`, a `WORKFLOW/` folder, issues), update task status there. `.workflow/` is Maestro's working state only.
+- **Commits follow `git.commit`** in the config: `per_card` (default) or `never`. With `never`, leave the verified changes uncommitted and list them in the report.
 - Never mark work done without real command output. **A free model's own report is not evidence**: re-run the checks and read the diff.
-- The implementer and its reviewer must come from **different providers** where possible (`--exclude-provider`).
+- A card is never reviewed by the model that implemented it (`--exclude-model`), and a different provider is preferred (`--avoid-provider`).
 - Keep `status.md` current after every phase and every card.
 - Never widen the scope. New ideas become follow-ups.
 - Never hard-code model choices in cards or prompts. Routing belongs to the agent files and the router.

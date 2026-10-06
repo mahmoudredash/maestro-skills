@@ -57,7 +57,7 @@ of the delegate-skills relays (`pi-delegate`, `commandcode-delegate`, `codex-del
 Preview it without running anything:
 ```bash
 $MR route --type feature --sensitivity sensitive
-$MR route --type tests --role reviewer --exclude-provider opencode-zen
+$MR route --type review --role reviewer --exclude-model opencode:opencode/big-pickle --avoid-provider opencode-zen
 ```
 
 ## Dispatch
@@ -66,7 +66,8 @@ $MR dispatch --brief .workflow/<run>/tasks/T03-x.md --out .workflow/<run>/logs/T
    --type feature --sensitivity normal --role implementer
 # reviewer (read-only, a different provider from the implementer):
 $MR dispatch --brief .workflow/<run>/logs/T03/review-brief.md --out .workflow/<run>/logs/T03/review \
-   --type review --role reviewer --read-only --exclude-provider <implementer provider>
+   --type review --role reviewer --read-only --exclude-model <implementer agent:model> --avoid-provider <implementer provider>
+# --exclude-provider p : hard exclusion; --avoid-provider p : soft (tried after every other provider)
 # options: --pin agent:model   --session <id> (FIX round on the same model)   --effort low|medium|high|max
 #          --agent opencode (repeatable; restrict agents)   --no-wait   --dry-run   --allow-dirty
 ```
@@ -80,6 +81,7 @@ What dispatch does:
   1. The router records it in `~/.config/maestro/state/limits.json` with a cooldown.
   2. It stashes any partial edits (`git stash list` shows "maestro: partial attempt by …").
   3. It re-ranks the candidates. With `limit_scope: provider`, every model of that provider, **in every agent**, is skipped until the cooldown ends.
+- **Infrastructure failure** (the relay reports the CLI was never dispatched, e.g. its `--version` preflight timed out on an overloaded machine): the same candidate is retried after a short pause (`dispatch.infra_retries`, default 2; `dispatch.infra_backoff_seconds`, default 20). It is not a model failure and records no limit.
 - **Hard failure:** it tries the next candidate, without recording a limit.
 - **The agent's CLI is missing:** that agent's other models are skipped for this dispatch.
 - It writes `<out>/dispatch.json` and prints it. Exit codes:

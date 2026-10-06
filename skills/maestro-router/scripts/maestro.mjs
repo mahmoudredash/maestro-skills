@@ -3,7 +3,7 @@
 //
 //   maestro.mjs route    --type <t> [--sensitivity normal|sensitive] [--role implementer|reviewer] [--exclude-provider p]...
 //   maestro.mjs dispatch --brief <card.md> --out <dir> [--type t] [--sensitivity s] [--role r] [--read-only]
-//                        [--exclude-provider p]... [--exclude-model m]... [--agent a]... [--pin agent:model]
+//                        [--exclude-provider p]... [--avoid-provider p]... [--exclude-model m]... [--agent a]... [--pin agent:model]
 //                        [--session id] [--effort e] [--no-wait] [--cycle n] [--allow-dirty] [--dry-run] [--cd repo]
 //   maestro.mjs wait     --until <ISO time> [--max-minutes n]   (sleep until a cooldown ends; run in background)
 //   maestro.mjs doctor   [--json]
@@ -21,8 +21,8 @@ import { readLimits, clearLimits, limitsPath } from "./lib/limits.mjs";
 import { rankCandidates } from "./lib/route.mjs";
 import { dispatch, findRelay, sleep, EXIT } from "./lib/dispatch.mjs";
 
-const MULTI = new Set(["exclude-provider", "exclude-model", "agent"]);
-const BOOL = new Set(["read-only", "no-wait", "allow-dirty", "dry-run", "json", "global", "project", "force", "help"]);
+const MULTI = new Set(["exclude-provider", "exclude-model", "avoid-provider", "agent"]);
+const BOOL = new Set(["read-only", "no-wait", "allow-dirty", "dry-run", "json", "global", "project", "force", "help", "verbose"]);
 
 function parseArgs(argv) {
   const out = { _: [] };
@@ -86,6 +86,7 @@ switch (cmd) {
       role,
       excludeProviders: args["exclude-provider"],
       excludeModels: args["exclude-model"],
+      avoidProviders: args["avoid-provider"],
       agents: args.agent ?? roleCfg.agents,
       minTier: roleCfg.min_tier,
     };
@@ -93,8 +94,9 @@ switch (cmd) {
     print({
       task,
       minTier,
-      chain: candidates.map((c, i) => ({ rank: i + 1, ref: c.ref, provider: c.model.provider, tier: c.model.tier, fit: c.fit, standby: !!c.standby })),
-      skipped,
+      chain: candidates.map((c, i) => ({ rank: i + 1, ref: c.ref, provider: c.model.provider, tier: c.model.tier, fit: c.fit, standby: !!c.standby, avoided: !!c.avoided })),
+      // Skipped models are NOT in the chain; listed only with --verbose to avoid misreading.
+      ...(args.verbose ? { skipped } : { skippedCount: skipped.length, note: "models not in `chain` are never used; add --verbose to see why each was skipped" }),
     });
     break;
   }
@@ -114,6 +116,7 @@ switch (cmd) {
       readOnly: !!args["read-only"],
       excludeProviders: args["exclude-provider"],
       excludeModels: args["exclude-model"],
+      avoidProviders: args["avoid-provider"],
       agents: args.agent,
       pin: args.pin,
       session: args.session,

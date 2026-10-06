@@ -261,3 +261,30 @@ test("wait_and_retry (inline): sleeps, retries the chain, then gives up after ma
   assert.equal(r.summary.status, "exhausted");
   assert.ok(r.order.filter((m) => m === "zen/mid").length === 2, `expected a second pass after the wait, got ${r.order}`);
 });
+
+// ── field fixes: infrastructure retries and soft provider avoidance ──
+
+test("dispatch: a relay that never started the CLI is retried on the SAME model (no limit, no switch)", () => {
+  const r = run({ "zen/mid": "infra-once" }, {}, [alpha(), beta()], { dispatch: { max_model_switches: 6, infra_retries: 2, infra_backoff_seconds: 0 } });
+  assert.equal(r.summary.status, "completed");
+  assert.equal(r.summary.model, "zen/mid");
+  assert.deepEqual(r.order, ["zen/mid", "zen/mid"]);
+  assert.equal(r.summary.attempts[0].outcome, "infra_retry");
+  assert.equal(readLimits()["provider:zen"], undefined);
+});
+
+test("dispatch: infra retries are bounded, then the router moves to the next model", () => {
+  const r = run({ "zen/mid": "infra" }, {}, [alpha(), beta()], { dispatch: { max_model_switches: 6, infra_retries: 1, infra_backoff_seconds: 0 } });
+  assert.equal(r.summary.status, "completed");
+  assert.deepEqual(r.order, ["zen/mid", "zen/mid", "zen/strong"]);
+});
+
+test("route: --avoid-provider keeps same-provider reviewers, but after every other provider", () => {
+  const onlyZen = rankCandidates([alpha()], { type: "feature", role: "reviewer", excludeModels: ["alpha:zen/strong"], avoidProviders: ["zen"] }, { routing });
+  assert.deepEqual(refs(onlyZen), ["alpha:zen/mid"], "an OpenCode-only setup still gets a reviewer");
+  const mixed = rankCandidates([alpha(), beta()], { type: "feature", role: "reviewer", avoidProviders: ["zen"] }, { routing });
+  assert.equal(mixed.candidates[0].model.provider, "cloud", "another provider goes first");
+  assert.ok(refs(mixed).includes("alpha:zen/strong"));
+  const hard = rankCandidates([alpha()], { type: "feature", role: "reviewer", excludeProviders: ["zen"] }, { routing });
+  assert.equal(hard.candidates.length, 0, "the hard flag still excludes");
+});

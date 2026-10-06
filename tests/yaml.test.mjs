@@ -68,3 +68,16 @@ test("every shipped default file parses", () => {
   const files = ["config.yaml", ...readdirSync(join(dir, "agents")).map((f) => join("agents", f))];
   for (const f of files) assert.doesNotThrow(() => parseYaml(readFileSync(join(dir, f), "utf8")), f);
 });
+
+test("inline comments after booleans and list items are ignored", () => {
+  const y = parseYaml(`
+agent: commandcode
+enabled: false   # disabled: project rule is OpenCode-only
+models:
+  - id: ling-3.1-flash:free   # free, no daily cap
+    status: disabled          # not used here
+`);
+  assert.equal(y.enabled, false);
+  assert.equal(y.models[0].id, "ling-3.1-flash:free");
+  assert.equal(y.models[0].status, "disabled");
+});

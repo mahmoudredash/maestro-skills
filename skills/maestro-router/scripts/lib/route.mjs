@@ -10,6 +10,8 @@
 //   4. Tier: sensitive work takes the STRONGEST first; normal work takes the
 //      CHEAPEST SUFFICIENT first (saves strong models' quota for work that needs it).
 //   5. Agent priority (lower first), then the model's fallback_order.
+// Providers in task.avoidProviders (soft exclusion, e.g. the implementer's provider for a
+// cross-review) go after every other candidate, but stay in the chain.
 // The returned list is the fallback chain: dispatch walks it in order.
 
 import { activeLimit } from "./limits.mjs";
@@ -27,6 +29,7 @@ export function rankCandidates(agents, task, { routing = {}, limits = {}, now = 
   const excludeProviders = new Set(task.excludeProviders ?? []);
   const excludeModels = new Set(task.excludeModels ?? []);
   const onlyAgents = task.agents?.length ? new Set(task.agents) : null;
+  const avoid = new Set(task.avoidProviders ?? []); // soft: tried only after every other provider
   const sensitive = task.sensitivity === "sensitive";
   const preferCheap = routing.prefer_cheapest_sufficient !== false;
 
@@ -47,12 +50,13 @@ export function rankCandidates(agents, task, { routing = {}, limits = {}, now = 
       if (lim) { skip(`limited until ${lim.until} (${lim.key})`); continue; }
       const fit = model.good_for.includes(type) ? 2 : model.good_for.includes("general") ? 1 : 0;
       if (fit === 0 && !routing.allow_unfit_fallback) { skip(`not good_for ${type}`); continue; }
-      all.push({ agent, model, ref, fit, standby: model.status === "standby" ? 1 : 0 });
+      all.push({ agent, model, ref, fit, standby: model.status === "standby" ? 1 : 0, avoided: avoid.has(model.provider) ? 1 : 0 });
     }
   }
 
   all.sort(
     (a, b) =>
+      a.avoided - b.avoided ||
       a.standby - b.standby ||
       b.fit - a.fit ||
       (sensitive || !preferCheap ? b.model.tier - a.model.tier : a.model.tier - b.model.tier) ||
