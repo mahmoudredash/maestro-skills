@@ -47,7 +47,7 @@ cards are the contract.
 ## Return (your final message to the leader: short, no diffs, no logs)
 ```
 WORKSTREAM W2 — <name>
-DONE: T05 (opencode:opencode/mimo-v2-pro-free → reviewed by pi:gpt-oss:120b, 1 attempt), T06 (...)
+DONE: T05 (opencode:opencode/big-pickle → reviewed by opencode:opencode/mimo-v2.6-flash-free, 1 attempt), T06 (...)
 AWAITING-LEADER (sensitive): T07 — diffstat: 2 files, +48 −3 — logs/T07
 TAKEOVER: T08 — reason: <one line> — logs/T08
 BLOCKED: exhausted at T09 — retryAfter 15:05Z — limited: provider:opencode-zen, model:commandcode:laguna-s-2.1-free

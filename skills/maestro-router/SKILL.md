@@ -94,6 +94,17 @@ What dispatch does:
 | 6 | `retry_later` | `wait_and_retry` is on: wait until `retryAfter`, then re-dispatch with `--cycle <nextCycle>` (below). |
 | 5 | `stopped` / `no_candidates` | Fix the precondition (dirty tree, a config that excludes every model). |
 
+## Pinning a role to exact models
+A project may require fixed models, for example "only Big Pickle implements, only Mimo reviews, no fallback". Express that with a per-role allowlist in the project's `.maestro/config.yaml`. Don't disable every other model by hand:
+```yaml
+profiles:
+  claude-led:
+    roles:
+      implementer: { pool: agents, models: ["opencode:opencode/big-pickle"] }
+      reviewer:    { pool: agents, models: ["opencode:opencode/mimo-v2.6-flash-free"], min_tier: 3 }
+on_exhaustion: ask   # a pinned model that hits its limit stops and asks; there is no other model to switch to
+```
+
 ## on_exhaustion
 - `ask` (**default**): the router returns `exhausted` right away, with `retryAfter`. The leader must STOP and ask the user, with options: wait until `retryAfter`, enable a `standby` or `disabled` model, add a model or agent, or have the leader do the card.
 - `wait_and_retry`: waits for the earliest cooldown to end (at most `max_wait_minutes` per wait, at most `max_cycles` waits), then retries. When the wait would be longer, or the cycles are used up, it returns `exhausted`, which you treat like `ask`.
@@ -110,6 +121,7 @@ What dispatch does:
 $MR limits show            # what is cooling down, until when, and why
 $MR limits clear [key]     # e.g. provider:opencode-zen, once you know the quota reset
 $MR doctor                 # CLIs on PATH, relays installed, model ids present in each agent's model list, speckit
+$MR doctor --fix           # set status: disabled on models your CLIs do not list (your config files only)
 $MR config                 # the resolved profile, roles, agents and models
 ```
 

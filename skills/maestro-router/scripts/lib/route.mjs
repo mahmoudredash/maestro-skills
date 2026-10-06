@@ -29,6 +29,7 @@ export function rankCandidates(agents, task, { routing = {}, limits = {}, now = 
   const excludeProviders = new Set(task.excludeProviders ?? []);
   const excludeModels = new Set(task.excludeModels ?? []);
   const onlyAgents = task.agents?.length ? new Set(task.agents) : null;
+  const onlyModels = task.models?.length ? new Set(task.models) : null; // role allowlist: "agent:model"
   const avoid = new Set(task.avoidProviders ?? []); // soft: tried only after every other provider
   const sensitive = task.sensitivity === "sensitive";
   const preferCheap = routing.prefer_cheapest_sufficient !== false;
@@ -41,6 +42,7 @@ export function rankCandidates(agents, task, { routing = {}, limits = {}, now = 
       const skip = (why) => skipped.push({ ref, why });
       if (!agent.enabled) { skip("agent disabled"); continue; }
       if (onlyAgents && !onlyAgents.has(agent.agent)) { skip("agent not selected"); continue; }
+      if (onlyModels && !onlyModels.has(ref)) { skip("not in this role's models allowlist"); continue; }
       if (model.status === "disabled") { skip("model disabled"); continue; }
       if (model.avoid_for.includes(type)) { skip(`avoid_for ${type}`); continue; }
       if (model.tier < minTier) { skip(`tier ${model.tier} < ${minTier}`); continue; }

@@ -9,7 +9,9 @@
 #
 # Extra free providers (Kilo, Cline, Ollama Cloud, OpenRouter free, ...) come from
 # the community extension pi-free:  pi install npm:pi-free
-# Verify ids with `pi --list-models` or `maestro.mjs doctor`.
+# The ids below are EXAMPLES and ship disabled: pi's model ids depend on the
+# providers and extensions you installed. Run `pi --list-models`, put the real ids
+# here, set `status: disabled`, then check with `maestro.mjs doctor`.
 # ─────────────────────────────────────────────────────────────────────────────
 
 agent: pi
@@ -31,12 +33,12 @@ limit_scope: provider
 cooldown_minutes: 60
 
 models:
-  - id: minimax-m2.5-free
+  - id: mimo-v2.6-flash-free
     relay_provider: opencode
     provider: opencode-zen
     tier: 4
     good_for: [feature, tests, refactor, general]
-    status: active
+    status: disabled
     fallback_order: 1
     notes: "OpenCode Zen free model through pi's built-in opencode provider."
 
@@ -45,7 +47,7 @@ models:
     provider: opencode-zen
     tier: 4
     good_for: [feature, refactor, complex-logic, general]
-    status: standby
+    status: disabled
     fallback_order: 2
 
   - id: gpt-oss:120b
@@ -53,7 +55,7 @@ models:
     provider: ollama-cloud
     tier: 4
     good_for: [feature, review, analysis, general]
-    status: active
+    status: disabled
     fallback_order: 3
     notes: "Needs pi-free + an Ollama Cloud login."
 
@@ -62,7 +64,7 @@ models:
     provider: ollama-cloud
     tier: 4
     good_for: [feature, refactor, tests]
-    status: standby
+    status: disabled
     fallback_order: 4
 
   - id: qwen/qwen3-coder:free
@@ -70,6 +72,6 @@ models:
     provider: openrouter-free
     tier: 3
     good_for: [feature, tests, mechanical]
-    status: standby
+    status: disabled
     fallback_order: 5
     notes: "OpenRouter free models share a small daily request cap."

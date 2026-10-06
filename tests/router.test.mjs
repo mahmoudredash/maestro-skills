@@ -290,3 +290,12 @@ test("route: --avoid-provider keeps same-provider reviewers, but after every oth
   const hard = rankCandidates([alpha()], { type: "feature", role: "reviewer", excludeProviders: ["zen"] }, { routing });
   assert.equal(hard.candidates.length, 0, "the hard flag still excludes");
 });
+
+test("route: a role's models allowlist pins it to exact models (no other fallback)", () => {
+  const r = rankCandidates([alpha(), beta()], { type: "feature", role: "implementer", models: ["alpha:zen/strong"] }, { routing });
+  assert.deepEqual(refs(r), ["alpha:zen/strong"]);
+  const done = run({}, {}, [alpha(), beta()], { roles: { implementer: { models: ["beta:other-strong"] } } });
+  assert.deepEqual(done.order, ["other-strong"]);
+  const none = run({ "other-strong": "limited" }, {}, [alpha(), beta()], { roles: { implementer: { models: ["beta:other-strong"] } } });
+  assert.equal(none.summary.status, "exhausted", "a pinned model hitting its limit stops instead of switching");
+});

@@ -106,6 +106,7 @@ export function dispatch(opts) {
     excludeModels: opts.excludeModels ?? [],
     avoidProviders: opts.avoidProviders ?? [],
     agents: opts.agents?.length ? opts.agents : roleCfg.agents,
+    models: roleCfg.models,
     minTier: roleCfg.min_tier,
   };
   const routing = config.routing ?? {};

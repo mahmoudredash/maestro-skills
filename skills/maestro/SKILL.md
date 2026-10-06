@@ -31,8 +31,10 @@ and the agent files. **Follow the roles exactly.** If `roles.leader.agent` is no
 tell the user once and continue anyway as the acting leader. The user switches the leader
 in the config file, not in chat.
 
-The first time in a new environment, also run `$MR doctor` and fix or report its problems:
-missing CLIs, a missing delegate-skills install, or model ids that don't exist.
+The first time in a project:
+- Run `$MR init --project` to create `.maestro/`. Then run `$MR doctor`, and `$MR doctor --fix` to disable model ids that this machine's CLIs don't list.
+- If the project already has delegation rules (for example "only model X implements"), the generated defaults probably conflict with them. Present that as a **decision** (`maestro-decisions`), and encode the answer with the per-role `models` allowlist (`maestro-router`). Never pick an option yourself.
+- Recommend committing `.maestro/`, since it holds the project's routing rules and the team should share them. `.workflow/` follows `state.commit_state`. Usage-limit state lives in `~/.config/maestro/state/` and is never committed.
 
 ## Language
 - Talk to the user in **their language** (often Egyptian Arabic). Keep technical terms in English.
