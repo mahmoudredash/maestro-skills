@@ -1,0 +1,10 @@
+{
+  "$schema": "https://skills.sh/schemas/skills.sh.schema.json",
+  "groupings": [
+    {
+      "title": "Maestro — orchestrate free models",
+      "description": "Leader analyzes, gets business decisions approved, plans, writes task cards, and delegates implementation and first review to free models across agent CLIs with automatic model fallback.",
+      "skills": ["maestro", "maestro-decisions", "maestro-breakdown", "maestro-router", "maestro-workstream", "maestro-review"]
+    }
+  ]
+}

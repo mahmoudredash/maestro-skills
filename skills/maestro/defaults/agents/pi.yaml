@@ -1,0 +1,75 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Agent: Pi  (dispatched through delegate-skills' pi-delegate)
+#
+# Pi takes the provider and the model as two flags, so each model has:
+#   id             → passed to --model
+#   relay_provider → passed to --provider
+#   provider       → Maestro's quota bucket (shared across agents: a limit on
+#                    "opencode-zen" here also blocks OpenCode's Zen models, and vice versa)
+#
+# Extra free providers (Kilo, Cline, Ollama Cloud, OpenRouter free, ...) come from
+# the community extension pi-free:  pi install npm:pi-free
+# Verify ids with `pi --list-models` or `maestro.mjs doctor`.
+# ─────────────────────────────────────────────────────────────────────────────
+
+agent: pi
+enabled: true
+priority: 2
+delegate_skill: pi-delegate
+binary: pi
+list_models_cmd: "pi --list-models"
+timeout: 45m
+
+relay_flags:
+  model: --model
+  provider: --provider
+  effort: ""                   # pi-delegate has no effort flag
+effort_map: {}
+
+limit_signals: ["429", "rate limit", "rate_limit", "quota", "usage limit", "too many requests", "free tier"]
+limit_scope: provider
+cooldown_minutes: 60
+
+models:
+  - id: minimax-m2.5-free
+    relay_provider: opencode
+    provider: opencode-zen
+    tier: 4
+    good_for: [feature, tests, refactor, general]
+    status: active
+    fallback_order: 1
+    notes: "OpenCode Zen free model through pi's built-in opencode provider."
+
+  - id: big-pickle
+    relay_provider: opencode
+    provider: opencode-zen
+    tier: 4
+    good_for: [feature, refactor, complex-logic, general]
+    status: standby
+    fallback_order: 2
+
+  - id: gpt-oss:120b
+    relay_provider: ollama-cloud
+    provider: ollama-cloud
+    tier: 4
+    good_for: [feature, review, analysis, general]
+    status: active
+    fallback_order: 3
+    notes: "Needs pi-free + an Ollama Cloud login."
+
+  - id: qwen3-coder:480b
+    relay_provider: ollama-cloud
+    provider: ollama-cloud
+    tier: 4
+    good_for: [feature, refactor, tests]
+    status: standby
+    fallback_order: 4
+
+  - id: qwen/qwen3-coder:free
+    relay_provider: openrouter
+    provider: openrouter-free
+    tier: 3
+    good_for: [feature, tests, mechanical]
+    status: standby
+    fallback_order: 5
+    notes: "OpenRouter free models share a small daily request cap."
