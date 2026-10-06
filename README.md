@@ -1,171 +1,180 @@
 # Maestro Skills 🎼
 
-**قائد واحد بيفكّر ويقرّر، وموديلات مجانية بتنفّذ.**
+**One leader thinks and decides; free models do the typing.**
 
-Maestro مجموعة skills بتخلّي أي agent (Claude Code افتراضياً، أو OpenCode، أو Pi، أو غيرهم) يشتغل على أي مهمة بنفس الطريقة كل مرة، من غير ما تحتاج تشرح له الخطوات:
+Maestro is a set of skills that makes any agent (Claude Code by default, or OpenCode, Pi, and
+others) handle every task the same way, without you re-explaining the process each time:
 
 ```
-طلب ─► تحليل ─► قرارات بيزنس (دور الخبير) ⏸ موافقتك ─► خطة (speckit) ─► كروت مهام واضحة جداً
-     ─► مديرين فرعيين (sub-agents) لكل مسار شغل ─► موديلات مجانية (opencode / pi / cmd) مع تحويل تلقائي لموديل تاني عند الحد
-     ─► اختبار + مراجعة متبادلة بموديل مختلف ─► مراجعة نهائية ─► تقرير
+request ─► analysis ─► business decisions (expert mode) ⏸ your approval ─► plan (speckit) ─► ultra-explicit task cards
+        ─► sub-leads (sub-agents) per workstream ─► free models (opencode / pi / cmd) with automatic fallback on usage limits
+        ─► tests + cross-review by a different model ─► final review ─► report
 ```
 
-الهدف إن **توكين Claude يتصرف على الحكم والقرار بس**، والكتابة والمراجعة الأولى تروح للموديلات المجانية.
+The goal: **spend Claude tokens only on judgment and decisions**, and hand the writing and the
+first-line review to free models.
 
 ---
 
-## المهارات (v1: Core)
+## Skills (v1 — core)
 
-| المهارة | الدور |
+| Skill | Role |
 |---|---|
-| `maestro` | **المنسّق الرئيسي.** بيشتغل تلقائياً على أي مهمة، وبيمشّي المراحل كلها، وبيكمّل من آخر نقطة لو الجلسة اتقطعت |
-| `maestro-decisions` | بيتقمّص دور الخبير في المجال، ويجهّز كل قرار باختياراته وإيجابياته وسلبياته وتوصيته، و**يوقف لحد ما توافق** |
-| `maestro-breakdown` | بيحوّل الخطة لكروت مهام مفصّلة جداً تناسب موديل مجاني، وكل كارت عليه Type و Sensitivity و Workstream |
-| `maestro-router` | بيختار الـ agent والموديل لكل كارت، ويبعته عن طريق delegate-skills، ولو الموديل وصل للحد بيحوّل للي بعده |
-| `maestro-workstream` | تعليمات المدير الفرعي (sub-lead) لمسار شغل واحد: يوزّع الكروت ويراجع ويعمل commit، ويرجّع للقائد ملخص قصير |
-| `maestro-review` | بيشغّل التستات بنفسه، ويعمل مراجعة متبادلة بموديل من provider مختلف، ويحكم بـ PASS أو FIX أو TAKEOVER، ويعمل المراجعة النهائية |
+| `maestro` | **Orchestrator.** Runs automatically on every task, drives all phases, and resumes from the last checkpoint if a session is interrupted |
+| `maestro-decisions` | Takes on the relevant expert role, prepares every decision with options, pros/cons and a recommendation, then **stops until you approve** |
+| `maestro-breakdown` | Turns the plan into ultra-explicit task cards a free model can execute, each tagged with Type / Sensitivity / Workstream |
+| `maestro-router` | Picks the agent + model for each card, dispatches it through delegate-skills, and falls back to the next model when one hits its usage limit |
+| `maestro-workstream` | Sub-lead playbook for one workstream: dispatches cards, reviews, commits, and returns a short summary to the leader |
+| `maestro-review` | Runs the tests itself, gets a cross-review from a model of a different provider, issues PASS / FIX / TAKEOVER, and runs the final review |
 
 ---
 
-## التثبيت
+## Installation
 
 ```bash
-# 1) المهارات (global)
-npx skills add <owner>/maestro-skills
-#    أو من نسخة محلية:
-git clone <repo-url> && cd maestro-skills && ./install.sh          # --link عشان تعديلاتك تتطبق على طول
+# 1) The skills (global)
+npx skills add mahmoudredash/maestro-skills
+#    or from a local clone:
+git clone https://github.com/mahmoudredash/maestro-skills && cd maestro-skills && ./install.sh   # --link to apply your edits live
 
-# 2) المتطلبات
-npx skills add amElnagdy/delegate-skills                             # relays التنفيذ (مطلوبة)
-uv tool install specify-cli --from git+https://github.com/github/spec-kit.git   # speckit (اختياري ومفضّل)
-#    وأدوات الـ agents اللي هتستخدمها: opencode / pi / cmd، مع تسجيل الدخول في كل واحدة
+# 2) Dependencies
+npx skills add amElnagdy/delegate-skills                             # dispatch relays (required)
+uv tool install specify-cli --from git+https://github.com/github/spec-kit.git   # speckit (optional, recommended)
+#    plus the agent CLIs you will use: opencode / pi / cmd — log in to each
 
-# 3) الإعدادات (نسخة تقدر تعدّلها)
+# 3) Editable configuration
 node ~/.claude/skills/maestro-router/scripts/maestro.mjs init --global     # ~/.config/maestro/
-node ~/.claude/skills/maestro-router/scripts/maestro.mjs init --project    # <repo>/.maestro/ (للمشروع ده بس)
+node ~/.claude/skills/maestro-router/scripts/maestro.mjs init --project    # <repo>/.maestro/ (this project only)
 
-# 4) فحص الإعداد
+# 4) Check the setup
 node ~/.claude/skills/maestro-router/scripts/maestro.mjs doctor
 ```
 
-**عشان يشتغل تلقائياً في كل مهمة:** انسخ محتوى `skills/maestro/templates/CLAUDE.md.snippet` في `~/.claude/CLAUDE.md`، أو في `CLAUDE.md` بتاع المشروع. ولو القائد مش Claude، استخدم `AGENTS.md.snippet`.
+**To make it automatic on every task:** copy `skills/maestro/templates/CLAUDE.md.snippet` into
+`~/.claude/CLAUDE.md` or the project's `CLAUDE.md`. If the leader is not Claude, use
+`AGENTS.md.snippet` instead.
 
 ---
 
-## الإعدادات: `config.yaml`
+## Configuration: `config.yaml`
 
-بيتدوّر عليه بالترتيب ده، وأول واحد موجود هو اللي بيتاخد:
+Looked up in this order (first one found wins):
 1. `--config-dir`
 2. `$MAESTRO_HOME`
 3. `<repo>/.maestro/`
 4. `~/.config/maestro/`
-5. الإعدادات الافتراضية في `skills/maestro/defaults/`
+5. the shipped defaults in `skills/maestro/defaults/`
 
-### الـ Profiles والأدوار
+### Profiles and roles
 ```yaml
-profile: claude-led          # الافتراضي. أو: free-only، أو profile تعمله بنفسك
+profile: claude-led          # default. Or: free-only, or a profile of your own
 profiles:
   claude-led:
     roles:
       leader:         { agent: claude-code, model: opus,   effort: high,   used_for: [...] }
       sub_lead:       { agent: claude-code, model: haiku,  effort: medium, used_for: [...] }
-      implementer:    { pool: agents, effort: medium }       # بيختار من ملفات الـ agents
+      implementer:    { pool: agents, effort: medium }       # picked from the agent files
       reviewer:       { pool: agents, min_tier: 3, effort: high }
       final_reviewer: { agent: claude-code, model: sonnet, effort: high }
 ```
-- **تغيير القائد:** غيّر `leader.agent` و `leader.model`. مثلاً `free-only` بيخلّي القائد `opencode` بموديل مجاني، ومن غير Claude خالص.
-- **مستوى التفكير `effort`:** واحد من `low | medium | high | max`. بيتحوّل تلقائياً للمقابل بتاعه في كل agent: `--variant` في opencode، و `--effort` في cmd.
-- **`used_for`:** مكتوب فيه كل دور بيستخدم موديله في إيه.
+- **Change the leader:** edit `leader.agent` and `leader.model`. For example, `free-only` makes the leader `opencode` with a free model, with no Claude at all.
+- **Effort:** one of `low | medium | high | max`. It is translated automatically to each agent's own flag: `--variant` in opencode, `--effort` in cmd.
+- **`used_for`:** documents what each role uses its model for.
 
-### لما كل الموديلات المجانية توصل للحد
+### When every free model is limited
 ```yaml
-on_exhaustion: ask           # الافتراضي: يوقف ويسألك
+on_exhaustion: ask           # default: stop and ask you
 # on_exhaustion: wait_and_retry
 wait_and_retry: { max_wait_minutes: 120, max_cycles: 3 }
 ```
 
 ---
 
-## ملفات الـ Agents: `agents/*.yaml`
+## Agent files: `agents/*.yaml`
 
-كل agent ليه ملف، وفي كل ملف **قايمة مفتوحة من الموديلات من أي provider**:
+One file per agent, each with an **open list of models from any provider**:
 
 ```yaml
 agent: opencode
 delegate_skill: opencode-delegate
-limit_scope: provider        # الحد بيتطبق على الـ provider كله، في كل الـ agents
+limit_scope: provider        # a limit applies to the whole provider, in every agent
 cooldown_minutes: 60
 models:
   - id: opencode/big-pickle
     provider: opencode-zen
-    tier: 4                  # 1 ضعيف … 5 الأقوى
+    tier: 4                  # 1 weakest … 5 strongest
     good_for: [feature, refactor, complex-logic, general]
-    status: active           # active | standby (احتياطي) | disabled
+    status: active           # active | standby (fallback only) | disabled
     fallback_order: 1
   - id: ollama-cloud/gpt-oss:120b
     provider: ollama-cloud
     tier: 4
-    status: standby          # «صفته تمام بس ما ضفتهوش»: بيشتغل بس لما اللي قبله يوصل للحد
+    status: standby          # "good, but held in reserve": used only when the models above hit their limits
 ```
 
-- **تضيف موديل:** تضيف entry جديد، وبعدها تشغّل `doctor` يتأكد إن الموديل موجود فعلاً.
-- **تضيف agent جديد:** تعمل ملف جديد يشاور على relay من delegate-skills، زي `codex-delegate` أو `kimi-delegate`.
+- **Add a model:** add an entry, then run `doctor` to confirm the model actually exists.
+- **Add an agent:** create a new file pointing to a delegate-skills relay, such as `codex-delegate` or `kimi-delegate`.
 
-الملفات الافتراضية فيها أشهر الموديلات المجانية وقت كتابة الملفات دي:
+The default files list the best-known free models at the time of writing:
 
-| الـ Agent | الموديلات |
+| Agent | Models |
 |---|---|
-| opencode | الموديلات المجانية في OpenCode Zen: `big-pickle`، `minimax-m2.5-free`، `mimo-v2-pro-free`، `nemotron-3-super-free`، `gpt-5-nano` |
-| pi | موديلات Zen من خلال pi، وموديلات Ollama Cloud و OpenRouter المجانية (محتاجة `pi install npm:pi-free`) |
-| cmd | `ling-3.1-flash:free`، `laguna-s-2.1-free`، `space-bunny-alpha`، `ling-3.0-flash-sante:free` |
+| opencode | OpenCode Zen free models: `big-pickle`, `minimax-m2.5-free`, `mimo-v2-pro-free`, `nemotron-3-super-free`, `gpt-5-nano` |
+| pi | Zen models through pi, plus free Ollama Cloud and OpenRouter models (requires `pi install npm:pi-free`) |
+| cmd | `ling-3.1-flash:free`, `laguna-s-2.1-free`, `space-bunny-alpha`, `ling-3.0-flash-sante:free` |
 
-⚠️ أسماء الموديلات المجانية بتتغيّر كتير. **شغّل `doctor`** بعد التثبيت، وعدّل الملفات على حسب حسابك.
+⚠️ Free model names change often. **Run `doctor`** after installing, and adjust the files to your accounts.
 
-### الموديل بيتختار إزاي؟
-1. **الاستبعاد:** بيتشال أي موديل `disabled`، أو في فترة cooldown، أو `tier` بتاعه أقل من الحد الأدنى، أو ما يناسبش نوع المهمة.
-2. **الترتيب:**
-   - `active` الأول، وبعده `standby`.
-   - الموديل المناسب للنوع بالظبط قبل الموديل العام (`general`).
-   - **المهام الحساسة** بتاخد أقوى موديل الأول.
-   - **المهام العادية** بتاخد أرخص موديل يكفيها، عشان حصص الموديلات القوية تفضل للمهام اللي محتاجاها.
-3. **التحويل:** الترتيب ده هو سلسلة التحويل. لو موديل وصل للحد، بيتعمل له cooldown، ولو `limit_scope: provider` بيتوقف الـ provider كله في كل الـ agents، وبعدها ينتقل للمرشح اللي بعده.
+### How a model is chosen
+1. **Filtering:** a model is dropped if it is `disabled`, in a cooldown, below the minimum `tier`, or not suited to the task type.
+2. **Ordering:**
+   - `active` first, then `standby`.
+   - A model suited to the exact type before a general one (`general`).
+   - **Sensitive tasks** get the strongest model first.
+   - **Normal tasks** get the cheapest model that is good enough, so the strong models' quota stays available for the tasks that need it.
+3. **Fallback:** this order is the fallback chain. When a model hits its limit it gets a cooldown — with `limit_scope: provider`, the whole provider is paused in every agent — and the next candidate takes over.
 
 ```bash
 MR="node ~/.claude/skills/maestro-router/scripts/maestro.mjs"
-$MR route --type feature --sensitivity sensitive     # يوريك الترتيب من غير ما ينفّذ حاجة
-$MR limits show                                      # مين واقف ولحد إمتى
-$MR limits clear provider:opencode-zen               # لو عارف إن الحد اتجدد
-$MR config                                           # الإعدادات النهائية بعد الدمج
+$MR route --type feature --sensitivity sensitive     # show the order without running anything
+$MR limits show                                      # what is cooling down, and until when
+$MR limits clear provider:opencode-zen               # if you know the quota has reset
+$MR config                                           # the final configuration after merging
 ```
 
 ---
 
-## الـ Sub-agents (التسلسل الهرمي)
+## Sub-agents (the hierarchy)
 ```
-القائد ─► sub-lead لكل مسار شغل (sub-agent رخيص، وسياقه منفصل) ─► موديلات مجانية ─► (الـ sub-agents بتوعها جوه الأداة نفسها)
+leader ─► one sub-lead per workstream (cheap sub-agent, separate context) ─► free models ─► (their own sub-agents inside their CLI)
 ```
-القائد بيقرا من كل sub-lead ملخص قصير بس. **في v1 المسارات بتشتغل واحد ورا التاني**، عشان ما يحصلش تعارض في git.
+The leader reads only a short summary from each sub-lead. **In v1, workstreams run one after
+another** to avoid git conflicts.
 
-لو القائد ما بيدعمش sub-agents، أو `sub_lead.agent: none`، المسارات بتتنفّذ inline جوه القائد نفسه.
+If the leader does not support sub-agents, or `sub_lead.agent: none`, workstreams run inline
+inside the leader itself.
 
 ---
 
-## الحالة والاستكمال
-كل مهمة ليها مجلد `.workflow/NNN-slug/`، وفيه التحليل والقرارات والخطة والكروت و`status.md` والـ logs. لو الجلسة اتقطعت، القائد بيقرا `status.md` ويكمّل من مكانه.
+## State and resuming
+Every task gets a `.workflow/NNN-slug/` folder holding the analysis, decisions, plan, cards,
+`status.md` and logs. If a session is interrupted, the leader reads `status.md` and continues
+from where it stopped.
 
-وقرارات البيزنس اللي اتوافق عليها بتتسجّل كمان في `docs/business-rules.md` جوه المشروع، عشان نفس السؤال ما يتسألش مرتين.
+Approved business decisions are also recorded in the project's `docs/business-rules.md`, so the
+same question is never asked twice.
 
 ---
 
-## الإضافات (Extensions)
-الـ core **مش معتمد على أي إضافة**. الإضافات بتتحط في مجلد `extensions/`، والمخطط ليها:
-- **OmniRoute:** طبقة providers تحت الـ agents.
-- **decision engine:** زي موديل *jev* من Command Code.
+## Extensions
+The core **depends on no extension**. Extensions live in the `extensions/` folder; planned ones:
+- **OmniRoute:** a provider layer underneath the agents.
+- **Decision engine:** for example Command Code's *jev* model.
 
-التفاصيل في `extensions/README.md`.
+Details in `extensions/README.md`.
 
-## التطوير
+## Development
 ```bash
-npm test        # تستات الـ router والـ YAML (من غير dependencies)
+npm test        # router and YAML tests (no dependencies)
 npm run doctor
 ```
