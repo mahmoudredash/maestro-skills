@@ -29,6 +29,7 @@ export function rankCandidates(agents, task, { routing = {}, limits = {}, now = 
   const excludeProviders = new Set(task.excludeProviders ?? []);
   const excludeModels = new Set(task.excludeModels ?? []);
   const onlyAgents = task.agents?.length ? new Set(task.agents) : null;
+  const demote = new Set(task.demoteAgents ?? []); // preflight said "fallback only"
   const onlyModels = task.models?.length ? new Set(task.models) : null; // role allowlist: "agent:model"
   const avoid = new Set(task.avoidProviders ?? []); // soft: tried only after every other provider
   const sensitive = task.sensitivity === "sensitive";
@@ -45,6 +46,8 @@ export function rankCandidates(agents, task, { routing = {}, limits = {}, now = 
       if (onlyModels && !onlyModels.has(ref)) { skip("not in this role's models allowlist"); continue; }
       if (model.status === "disabled") { skip("model disabled"); continue; }
       if (model.avoid_for.includes(type)) { skip(`avoid_for ${type}`); continue; }
+      if (model.roles && !model.roles.includes(task.role ?? "implementer")) { skip(`role ${task.role} not allowed`); continue; }
+      if (sensitive && model.sensitive_ok === false) { skip("not allowed for sensitive cards"); continue; }
       if (model.tier < minTier) { skip(`tier ${model.tier} < ${minTier}`); continue; }
       if (excludeProviders.has(model.provider)) { skip(`provider ${model.provider} excluded`); continue; }
       if (excludeModels.has(model.id) || excludeModels.has(ref)) { skip("model excluded"); continue; }
@@ -52,7 +55,8 @@ export function rankCandidates(agents, task, { routing = {}, limits = {}, now = 
       if (lim) { skip(`limited until ${lim.until} (${lim.key})`); continue; }
       const fit = model.good_for.includes(type) ? 2 : model.good_for.includes("general") ? 1 : 0;
       if (fit === 0 && !routing.allow_unfit_fallback) { skip(`not good_for ${type}`); continue; }
-      all.push({ agent, model, ref, fit, standby: model.status === "standby" ? 1 : 0, avoided: avoid.has(model.provider) ? 1 : 0 });
+      const demoted = demote.has(agent.agent);
+      all.push({ agent, model, ref, fit, standby: model.status === "standby" || demoted ? 1 : 0, avoided: avoid.has(model.provider) ? 1 : 0 });
     }
   }
 

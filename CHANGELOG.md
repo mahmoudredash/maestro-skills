@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.0 — extension packs + OmniRoute
+- Router: skills that ship `maestro-agents/*.yaml` are discovered as extension packs (overridable from the config dir, `extensions.disabled` to turn off).
+- Router: per-agent `preflight` hook (0 ok · 3 fallback-only · else skip + `agent:<name>` cooldown); per-model `roles` and `sensitive_ok`.
+- New optional pack `maestro-omniroute`: OpenCode through a local OmniRoute gateway, health + strict-free-policy preflight, safe compression, `setup` / `check` / `attest-strict`.
+
 ## 1.0.1 — field fixes (from a real project run)
 - Decisions: no silent defaults. An unanswered decision is never applied; dependent work waits and the question is asked again.
 - Hard rules: never bypass the router with a direct CLI call; the project's own tracker (Spec Kit, WORKFLOW/) stays the source of truth; commits follow `git.commit` (`per_card` | `never`).

@@ -6,7 +6,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { spawnSync, execFileSync } from "node:child_process";
 import { SKILLS_ROOT, gitRoot } from "./config.mjs";
-import { readLimits, markLimited, looksLimited, looksInfra } from "./limits.mjs";
+import { readLimits, markLimited, markAgentDown, looksLimited, looksInfra } from "./limits.mjs";
 import { rankCandidates, earliestRecovery } from "./route.mjs";
 
 export const EXIT = { OK: 0, USAGE: 2, FAILED: 3, EXHAUSTED: 4, STOPPED: 5, RETRY_LATER: 6 };
@@ -82,6 +82,17 @@ function hasIdentity(cwd) {
   }
 }
 
+/** Runs an agent's preflight command. Exit 0 → ok, 3 → standby (fallback only), else → down. */
+export function runPreflight(agent, cwd = process.cwd()) {
+  if (!agent.preflight) return { state: "ok", detail: "no preflight" };
+  const cmd = agent.preflight.cmd.replaceAll("{node}", JSON.stringify(process.execPath)).replaceAll("{skills_root}", JSON.stringify(SKILLS_ROOT));
+  const r = spawnSync("sh", ["-c", cmd], { cwd, encoding: "utf8", timeout: agent.preflight.timeout_seconds * 1000 });
+  const detail = `${(r.stdout ?? "").trim()} ${(r.stderr ?? "").trim()}`.trim().slice(-400) || (r.error ? String(r.error.message) : "");
+  if (r.status === 0) return { state: "ok", detail };
+  if (r.status === 3) return { state: "standby", detail };
+  return { state: "down", detail: detail || `exit ${r.status ?? r.signal}` };
+}
+
 /**
  * opts: { brief, cd, out, type, sensitivity, role, readOnly, excludeProviders, excludeModels,
  *         agents (filter), pin ("agent:model"), session, effort, wait (bool), cycle (waits already done),
@@ -128,6 +139,23 @@ export function dispatch(opts) {
     }
   }
 
+  // Preflight: one health check per agent that has one, before any relay starts.
+  const preflight = {};
+  task.demoteAgents = [];
+  const seen = new Set();
+  for (const c of rankCandidates(agentsList, task, { routing, limits: readLimits() }).candidates) {
+    if (!c.agent.preflight || seen.has(c.agent.agent)) continue;
+    seen.add(c.agent.agent);
+    const pf = runPreflight(c.agent, cd);
+    preflight[c.agent.agent] = pf;
+    if (pf.state === "standby") task.demoteAgents.push(c.agent.agent);
+    if (pf.state === "down") {
+      log(`maestro: ${c.agent.agent} preflight failed (${pf.detail}); skipping it`);
+      if (!opts.dryRun) markAgentDown(c.agent, c.agent.preflight.cooldown_minutes, `preflight failed: ${pf.detail}`);
+      else unavailableAgents.add(c.agent.agent);
+    }
+  }
+
   for (;;) {
     const limits = readLimits();
     let { candidates, skipped, minTier } = rankCandidates(agentsList, task, { routing, limits });
@@ -141,9 +169,10 @@ export function dispatch(opts) {
       return finish(out, {
         status: "dry_run",
         task,
+        preflight,
         minTier,
         effort,
-        chain: candidates.map((c, i) => ({
+        chain: candidates.filter((c) => !unavailableAgents.has(c.agent.agent)).map((c, i) => ({
           rank: i + 1,
           ref: c.ref,
           provider: c.model.provider,
@@ -206,6 +235,7 @@ export function dispatch(opts) {
           tier: c.model.tier,
           sessionId: result.sessionId ?? null,
           resultPath,
+          preflight,
           touchedFiles: result.touchedFiles ?? null,
           finalMessage: result.finalMessage ?? "",
           attempts,

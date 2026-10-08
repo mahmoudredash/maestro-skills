@@ -20,7 +20,7 @@ import { loadConfig, DEFAULTS_DIR, gitRoot, globalConfigDir } from "./lib/config
 import { readLimits, clearLimits, limitsPath } from "./lib/limits.mjs";
 import { rankCandidates } from "./lib/route.mjs";
 import { disableModelsInFile } from "./lib/fix-models.mjs";
-import { dispatch, findRelay, sleep, EXIT } from "./lib/dispatch.mjs";
+import { dispatch, findRelay, runPreflight, sleep, EXIT } from "./lib/dispatch.mjs";
 
 const MULTI = new Set(["exclude-provider", "exclude-model", "avoid-provider", "agent"]);
 const BOOL = new Set(["read-only", "no-wait", "allow-dirty", "dry-run", "json", "global", "project", "force", "help", "verbose", "fix"]);
@@ -73,7 +73,7 @@ function load() {
 switch (cmd) {
   case "config": {
     const { config, agents, sources } = load();
-    print({ sources, profile: config.activeProfile, on_exhaustion: config.on_exhaustion, roles: config.roles, routing: config.routing, agents: agents.map((a) => ({ agent: a.agent, enabled: a.enabled, file: a.file, models: a.models.map((m) => `${m.id} [${m.provider}] tier=${m.tier} ${m.status}`) })) });
+    print({ sources, profile: config.activeProfile, on_exhaustion: config.on_exhaustion, roles: config.roles, routing: config.routing, agents: agents.map((a) => ({ agent: a.agent, pack: a.pack ?? null, enabled: a.enabled, file: a.file, preflight: a.preflight?.cmd ?? null, models: a.models.map((m) => `${m.id} [${m.provider}] tier=${m.tier} ${m.status}`) })) });
     break;
   }
 
@@ -185,7 +185,12 @@ switch (cmd) {
     for (const a of agents) {
       const bin = spawnSync("sh", ["-c", `command -v ${a.binary}`], { encoding: "utf8" });
       const relay = findRelay(a.delegate_skill);
-      const entry = { agent: a.agent, enabled: a.enabled, binary: bin.status === 0 ? bin.stdout.trim() : null, relay, models: [] };
+      const entry = { agent: a.agent, pack: a.pack ?? null, enabled: a.enabled, binary: bin.status === 0 ? bin.stdout.trim() : null, relay, models: [] };
+      if (a.preflight) {
+        entry.preflight = runPreflight(a);
+        if (a.enabled && entry.preflight.state === "down") report.problems.push(`${a.agent}: preflight failed — ${entry.preflight.detail} (its models are skipped until it passes)`);
+        if (a.enabled && entry.preflight.state === "standby") report.problems.push(`${a.agent}: preflight says fallback-only — ${entry.preflight.detail}`);
+      }
       let listing = null;
       if (entry.binary && a.list_models_cmd) {
         const r = spawnSync("sh", ["-c", a.list_models_cmd], { encoding: "utf8", timeout: 30_000 });
@@ -215,9 +220,9 @@ switch (cmd) {
     if (!report.speckit.cli && !report.speckit.project_initialized) report.problems.push("speckit not found (optional): uv tool install specify-cli --from git+https://github.com/github/spec-kit.git ; then: specify init --here");
     if (args.json) print(report);
     else {
-      const lines = [`node ${report.node} · profile ${report.profile} · on_exhaustion ${report.on_exhaustion}`, `config: ${sources.config} (${sources.configScope})`, `agents: ${sources.agents ?? "none"} (${sources.agentsScope ?? "-"})`, ""];
+      const lines = [`node ${report.node} · profile ${report.profile} · on_exhaustion ${report.on_exhaustion}`, `config: ${sources.config} (${sources.configScope})`, `agents: ${sources.agents ?? "none"} (${sources.agentsScope ?? "-"})`, `packs: ${sources.packs?.length ? sources.packs.join(", ") : "none"}`, ""];
       for (const a of report.agents) {
-        lines.push(`${a.enabled ? "●" : "○"} ${a.agent}  binary=${a.binary ? "ok" : "MISSING"}  relay=${a.relay ? "ok" : "MISSING"}`);
+        lines.push(`${a.enabled ? "●" : "○"} ${a.agent}${a.pack ? ` [pack ${a.pack}]` : ""}  binary=${a.binary ? "ok" : "MISSING"}  relay=${a.relay ? "ok" : "MISSING"}${a.preflight ? `  preflight=${a.preflight.state}` : ""}`);
         for (const m of a.models) lines.push(`    ${m.available === true ? "✓" : m.available === false ? "✗" : "?"} ${m.id}  tier ${m.tier}  ${m.status}`);
       }
       lines.push("", `speckit: cli=${report.speckit.cli ? "ok" : "missing"} project=${report.speckit.project_initialized ? "initialized" : "not initialized"}`);

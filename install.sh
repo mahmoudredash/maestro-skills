@@ -5,6 +5,7 @@
 #   ./install.sh --link              # symlink instead of copy (edits in this repo apply live)
 #   ./install.sh --target claude     # only one target: claude | opencode | agents | pi | all
 #   ./install.sh --project <repo>    # install into <repo>/.claude/skills instead of globally
+#   ./install.sh --with omniroute    # also install an optional extension pack (repeatable)
 #
 # Recommended alternative:  npx skills add <owner>/maestro-skills
 set -euo pipefail
@@ -13,13 +14,15 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MODE=copy
 TARGET=all
 PROJECT=""
+WITH=()
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --link) MODE=link ;;
     --target) TARGET="${2:?}"; shift ;;
     --project) PROJECT="${2:?}"; shift ;;
-    -h|--help) sed -n '2,10p' "$0"; exit 0 ;;
+    --with) WITH+=("maestro-${2#maestro-}"); shift ;;
+    -h|--help) sed -n '2,11p' "$0"; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 2 ;;
   esac
   shift
@@ -43,6 +46,8 @@ for d in "${dests[@]}"; do
   mkdir -p "$d"
   for s in "$HERE"/skills/*/; do
     name="$(basename "$s")"
+    # Extension packs (skills shipping maestro-agents/) are opt-in via --with.
+    if [ -d "$s/maestro-agents" ] && [[ ! " ${WITH[*]-} " =~ " $name " ]]; then continue; fi
     rm -rf "${d:?}/$name"
     if [ "$MODE" = link ]; then ln -s "${s%/}" "$d/$name"; else cp -R "${s%/}" "$d/$name"; fi
   done
