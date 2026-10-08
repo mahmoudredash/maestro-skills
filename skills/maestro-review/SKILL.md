@@ -16,7 +16,7 @@ implementer's report, or a reviewer model's opinion, is input to your decision, 
 2. **Verify:** run every command in the card's Verify section. Save the output to `logs/T0X/verify.txt`. Any failure means FIX.
 3. **Cross-review** (cheap, and catches what tests miss):
    - Fill in `references/review-brief-template.md`, including the full `git diff`.
-   - Dispatch with `--role reviewer --read-only --exclude-provider <implementer's provider>`.
+   - Dispatch with `--role reviewer --read-only --exclude-model <implementer agent:model> --avoid-provider <implementer provider>`. The same model is never its own reviewer. A different provider is preferred, but when every eligible reviewer shares the implementer's provider (for example an OpenCode-only setup), a different model from that provider still reviews.
    - The reviewer returns a JSON verdict. A `blocking` finding means FIX, **after you confirm it in the diff**. Reviewer models sometimes hallucinate problems: drop any finding you cannot point to in the diff.
    - If the reviewer dispatch comes back `exhausted`, skip the cross-review for normal cards and note it. For sensitive cards, escalate to the leader instead.
 4. **Done criteria:** tick each one. The card's worked examples must exist as passing tests.

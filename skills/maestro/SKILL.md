@@ -31,8 +31,10 @@ and the agent files. **Follow the roles exactly.** If `roles.leader.agent` is no
 tell the user once and continue anyway as the acting leader. The user switches the leader
 in the config file, not in chat.
 
-The first time in a new environment, also run `$MR doctor` and fix or report its problems:
-missing CLIs, a missing delegate-skills install, or model ids that don't exist.
+The first time in a project:
+- Run `$MR init --project` to create `.maestro/`. Then run `$MR doctor`, and `$MR doctor --fix` to disable model ids that this machine's CLIs don't list.
+- If the project already has delegation rules (for example "only model X implements"), the generated defaults probably conflict with them. Present that as a **decision** (`maestro-decisions`), and encode the answer with the per-role `models` allowlist (`maestro-router`). Never pick an option yourself.
+- Recommend committing `.maestro/`, since it holds the project's routing rules and the team should share them. `.workflow/` follows `state.commit_state`. Usage-limit state lives in `~/.config/maestro/state/` and is never committed.
 
 ## Language
 - Talk to the user in **their language** (often Egyptian Arabic). Keep technical terms in English.
@@ -149,9 +151,12 @@ In the user's language, report:
 Then commit the state folder (if `state.commit_state`) and push, following the repo's git rules.
 
 ## Hard rules
-- Never skip the decisions gate when a real business or domain decision exists.
+- Never skip the decisions gate when a real business or domain decision exists. **Unanswered is not approved**: never apply an option the user did not choose, configuration choices included (see `maestro-decisions`).
+- **Never bypass the router.** If a dispatch fails for infrastructure reasons (a CLI hangs, a relay preflight times out, the machine is overloaded), do not run the agent CLI directly instead. A direct run loses the read-only enforcement, the limit tracking, and the logs. Retry through the router later (`$MR dispatch ...` again, or wait for `retry_later`), or report the blocker and ask.
+- **The project's own tracker stays the source of truth.** If the project already tracks tasks and decisions (Spec Kit `tasks.md`, a `WORKFLOW/` folder, issues), update task status there. `.workflow/` is Maestro's working state only.
+- **Commits follow `git.commit`** in the config: `per_card` (default) or `never`. With `never`, leave the verified changes uncommitted and list them in the report.
 - Never mark work done without real command output. **A free model's own report is not evidence**: re-run the checks and read the diff.
-- The implementer and its reviewer must come from **different providers** where possible (`--exclude-provider`).
+- A card is never reviewed by the model that implemented it (`--exclude-model`), and a different provider is preferred (`--avoid-provider`).
 - Keep `status.md` current after every phase and every card.
 - Never widen the scope. New ideas become follow-ups.
 - Never hard-code model choices in cards or prompts. Routing belongs to the agent files and the router.

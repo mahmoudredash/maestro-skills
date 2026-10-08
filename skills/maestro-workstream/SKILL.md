@@ -34,10 +34,11 @@ cards are the contract.
    - Read the done criteria.
 4. **Cross-review:** build `logs/T0X/review-brief.md` from `maestro-review/references/review-brief-template.md`, then:
    ```bash
-   $MR dispatch --brief logs/T0X/review-brief.md --out logs/T0X/review --type review --role reviewer --read-only --exclude-provider <implementer provider>
+   $MR dispatch --brief logs/T0X/review-brief.md --out logs/T0X/review --type review --role reviewer --read-only \
+      --exclude-model <implementer agent:model> --avoid-provider <implementer provider>
    ```
 5. **Verdict** (rules in `maestro-review`):
-   - **PASS** → commit only the card's files: `T0X: <title>`, with a trailer `Implemented-by: <agent:model>` / `Reviewed-by: <agent:model>`.
+   - **PASS** → if `git.commit` is `per_card` (the default), commit only the card's files: `T0X: <title>`, with a trailer `Implemented-by: <agent:model>` / `Reviewed-by: <agent:model>`. If it is `never`, leave the changes uncommitted and record PASS in `status.md`.
    - **FIX** → append the feedback to the card. Re-dispatch with `--session <sessionId> --pin <same agent:model> --allow-dirty` (the tree still holds the attempt; the brief is just the feedback delta), up to 2 times per model. After that, revert the attempt (`git stash`) and dispatch with no pin, so the router picks the next model.
    - **TAKEOVER** → after 3 failed attempts across models, or when the card itself is wrong: stash the attempt, mark the card TAKEOVER, and continue with the cards that don't depend on it.
 6. **Sensitive cards:** after the reviewer's PASS, do **not** commit. Mark the card `AWAITING-LEADER` and include its diff stat in the summary. The leader reads the diff and commits it.
@@ -46,7 +47,7 @@ cards are the contract.
 ## Return (your final message to the leader: short, no diffs, no logs)
 ```
 WORKSTREAM W2 — <name>
-DONE: T05 (opencode:opencode/mimo-v2-pro-free → reviewed by pi:gpt-oss:120b, 1 attempt), T06 (...)
+DONE: T05 (opencode:opencode/big-pickle → reviewed by opencode:opencode/mimo-v2.6-flash-free, 1 attempt), T06 (...)
 AWAITING-LEADER (sensitive): T07 — diffstat: 2 files, +48 −3 — logs/T07
 TAKEOVER: T08 — reason: <one line> — logs/T08
 BLOCKED: exhausted at T09 — retryAfter 15:05Z — limited: provider:opencode-zen, model:commandcode:laguna-s-2.1-free

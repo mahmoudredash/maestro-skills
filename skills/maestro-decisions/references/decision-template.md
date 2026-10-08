@@ -17,7 +17,7 @@ Status: WAITING ON USER | ANSWERED (<date>)
 
 **Recommendation: A**, because <expert reasoning: industry practice / regulation / failure modes>.
 **Would change my mind if:** <condition>
-**Default if unanswered:** A (assumed and flagged in the report)
+**If skipped:** nothing is assumed. The work that depends on this decision waits, and the question is asked again.
 **Effect on plan:** <cards / files affected>
 
 **User answer:** _pending_  →  APPROVED | CHANGED → B | DEFERRED | CUSTOM: ...

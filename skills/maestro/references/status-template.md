@@ -19,7 +19,7 @@
 ## Cards
 | ID | Type | Sens. | Implemented by | Reviewed by | Attempts | Verdict | Commit | Notes |
 |----|------|-------|----------------|-------------|----------|---------|--------|-------|
-| T01 | feature | normal | opencode:opencode/mimo-v2-pro-free | pi:gpt-oss:120b | 1 | PASS | abc123 | |
+| T01 | feature | normal | opencode:opencode/big-pickle | opencode:opencode/mimo-v2.6-flash-free | 1 | PASS | abc123 | |
 | T02 | feature | sensitive | opencode:opencode/big-pickle | pi:gpt-oss:120b | 2 | FIX→PASS | def456 | zen limited once → fell back |
 | T03 | migration | sensitive | — | — | 3 | TAKEOVER | 789abc | leader rewrote card |
 

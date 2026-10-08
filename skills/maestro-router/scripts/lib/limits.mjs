@@ -67,6 +67,14 @@ export function clearLimits({ path, key } = {}) {
   writeLimits(key ? limits : {}, path);
 }
 
+/** True when the relay says the CLI never actually ran (overloaded machine, hung version check). */
+export function looksInfra(agent, result) {
+  if (!result || result.status === "completed") return false;
+  if (Array.isArray(result.touchedFiles) && result.touchedFiles.length > 0) return false;
+  const text = [result.error, result.stderrTail].flat().filter(Boolean).join("\n").toLowerCase();
+  return (agent.infra_signals ?? []).some((s) => text.includes(s));
+}
+
 /** True when a relay result looks like a usage/rate limit rather than a real failure. */
 export function looksLimited(agent, result) {
   if (!result) return false;

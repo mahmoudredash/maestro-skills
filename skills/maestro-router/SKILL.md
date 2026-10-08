@@ -71,7 +71,7 @@ the pack's. To turn a pack off: `extensions: { disabled: [<skill name>] }` in `c
 Preview it without running anything:
 ```bash
 $MR route --type feature --sensitivity sensitive
-$MR route --type tests --role reviewer --exclude-provider opencode-zen
+$MR route --type review --role reviewer --exclude-model opencode:opencode/big-pickle --avoid-provider opencode-zen
 ```
 
 ## Dispatch
@@ -80,7 +80,8 @@ $MR dispatch --brief .workflow/<run>/tasks/T03-x.md --out .workflow/<run>/logs/T
    --type feature --sensitivity normal --role implementer
 # reviewer (read-only, a different provider from the implementer):
 $MR dispatch --brief .workflow/<run>/logs/T03/review-brief.md --out .workflow/<run>/logs/T03/review \
-   --type review --role reviewer --read-only --exclude-provider <implementer provider>
+   --type review --role reviewer --read-only --exclude-model <implementer agent:model> --avoid-provider <implementer provider>
+# --exclude-provider p : hard exclusion; --avoid-provider p : soft (tried after every other provider)
 # options: --pin agent:model   --session <id> (FIX round on the same model)   --effort low|medium|high|max
 #          --agent opencode (repeatable; restrict agents)   --no-wait   --dry-run   --allow-dirty
 ```
@@ -94,6 +95,7 @@ What dispatch does:
   1. The router records it in `~/.config/maestro/state/limits.json` with a cooldown.
   2. It stashes any partial edits (`git stash list` shows "maestro: partial attempt by …").
   3. It re-ranks the candidates. With `limit_scope: provider`, every model of that provider, **in every agent**, is skipped until the cooldown ends.
+- **Infrastructure failure** (the relay reports the CLI was never dispatched, e.g. its `--version` preflight timed out on an overloaded machine): the same candidate is retried after a short pause (`dispatch.infra_retries`, default 2; `dispatch.infra_backoff_seconds`, default 20). It is not a model failure and records no limit.
 - **Hard failure:** it tries the next candidate, without recording a limit.
 - **The agent's CLI is missing:** that agent's other models are skipped for this dispatch.
 - It writes `<out>/dispatch.json` and prints it. Exit codes:
@@ -105,6 +107,17 @@ What dispatch does:
 | 4 | `exhausted` | Every candidate is limited. Apply `on_exhaustion` (below). |
 | 6 | `retry_later` | `wait_and_retry` is on: wait until `retryAfter`, then re-dispatch with `--cycle <nextCycle>` (below). |
 | 5 | `stopped` / `no_candidates` | Fix the precondition (dirty tree, a config that excludes every model). |
+
+## Pinning a role to exact models
+A project may require fixed models, for example "only Big Pickle implements, only Mimo reviews, no fallback". Express that with a per-role allowlist in the project's `.maestro/config.yaml`. Don't disable every other model by hand:
+```yaml
+profiles:
+  claude-led:
+    roles:
+      implementer: { pool: agents, models: ["opencode:opencode/big-pickle"] }
+      reviewer:    { pool: agents, models: ["opencode:opencode/mimo-v2.6-flash-free"], min_tier: 3 }
+on_exhaustion: ask   # a pinned model that hits its limit stops and asks; there is no other model to switch to
+```
 
 ## on_exhaustion
 - `ask` (**default**): the router returns `exhausted` right away, with `retryAfter`. The leader must STOP and ask the user, with options: wait until `retryAfter`, enable a `standby` or `disabled` model, add a model or agent, or have the leader do the card.
@@ -122,6 +135,7 @@ What dispatch does:
 $MR limits show            # what is cooling down, until when, and why
 $MR limits clear [key]     # e.g. provider:opencode-zen, once you know the quota reset
 $MR doctor                 # CLIs on PATH, relays installed, model ids present in each agent's model list, speckit
+$MR doctor --fix           # set status: disabled on models your CLIs do not list (your config files only)
 $MR config                 # the resolved profile, roles, agents and models
 ```
 

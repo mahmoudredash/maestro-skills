@@ -10,6 +10,8 @@
 //   4. Tier: sensitive work takes the STRONGEST first; normal work takes the
 //      CHEAPEST SUFFICIENT first (saves strong models' quota for work that needs it).
 //   5. Agent priority (lower first), then the model's fallback_order.
+// Providers in task.avoidProviders (soft exclusion, e.g. the implementer's provider for a
+// cross-review) go after every other candidate, but stay in the chain.
 // The returned list is the fallback chain: dispatch walks it in order.
 
 import { activeLimit } from "./limits.mjs";
@@ -28,6 +30,8 @@ export function rankCandidates(agents, task, { routing = {}, limits = {}, now = 
   const excludeModels = new Set(task.excludeModels ?? []);
   const onlyAgents = task.agents?.length ? new Set(task.agents) : null;
   const demote = new Set(task.demoteAgents ?? []); // preflight said "fallback only"
+  const onlyModels = task.models?.length ? new Set(task.models) : null; // role allowlist: "agent:model"
+  const avoid = new Set(task.avoidProviders ?? []); // soft: tried only after every other provider
   const sensitive = task.sensitivity === "sensitive";
   const preferCheap = routing.prefer_cheapest_sufficient !== false;
 
@@ -39,6 +43,7 @@ export function rankCandidates(agents, task, { routing = {}, limits = {}, now = 
       const skip = (why) => skipped.push({ ref, why });
       if (!agent.enabled) { skip("agent disabled"); continue; }
       if (onlyAgents && !onlyAgents.has(agent.agent)) { skip("agent not selected"); continue; }
+      if (onlyModels && !onlyModels.has(ref)) { skip("not in this role's models allowlist"); continue; }
       if (model.status === "disabled") { skip("model disabled"); continue; }
       if (model.avoid_for.includes(type)) { skip(`avoid_for ${type}`); continue; }
       if (model.roles && !model.roles.includes(task.role ?? "implementer")) { skip(`role ${task.role} not allowed`); continue; }
@@ -51,12 +56,13 @@ export function rankCandidates(agents, task, { routing = {}, limits = {}, now = 
       const fit = model.good_for.includes(type) ? 2 : model.good_for.includes("general") ? 1 : 0;
       if (fit === 0 && !routing.allow_unfit_fallback) { skip(`not good_for ${type}`); continue; }
       const demoted = demote.has(agent.agent);
-      all.push({ agent, model, ref, fit, standby: model.status === "standby" || demoted ? 1 : 0 });
+      all.push({ agent, model, ref, fit, standby: model.status === "standby" || demoted ? 1 : 0, avoided: avoid.has(model.provider) ? 1 : 0 });
     }
   }
 
   all.sort(
     (a, b) =>
+      a.avoided - b.avoided ||
       a.standby - b.standby ||
       b.fit - a.fit ||
       (sensitive || !preferCheap ? b.model.tier - a.model.tier : a.model.tier - b.model.tier) ||

@@ -49,10 +49,16 @@ sensitive_topics:
 dispatch:
   max_model_switches: 6     # fallback hops per card before giving up
   default_timeout: 45m      # per relay run, unless the agent file sets its own
+  infra_retries: 2          # retries of the SAME model when the relay never started the CLI
+  infra_backoff_seconds: 20 # pause before each such retry (e.g. a version check timed out under load)
 
 hierarchy:
   max_depth: 3              # leader → sub_lead → implementer (implementers may nest further inside their own CLI)
   workstreams: sequential   # v1: sequential. Sub-leads isolate context and save leader tokens.
+
+git:
+  commit: per_card          # per_card: the sub-lead commits each card that passes review
+                            # never:    nothing is committed automatically; the report lists the changes
 
 state:
   dir: .workflow            # per-task state folders live here, inside the project
