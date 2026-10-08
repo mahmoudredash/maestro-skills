@@ -3,8 +3,9 @@
 #
 # Model list is OPEN: add as many models as you like, from ANY provider OpenCode
 # is logged into (opencode auth login). Free model IDs change often; the defaults
-# below are the well-known OpenCode Zen free models at the time of writing.
-# Run `node <maestro-router>/scripts/maestro.mjs doctor` to verify which exist.
+# below were confirmed against `opencode models` on a real install (2026-10).
+# Run `maestro.mjs doctor` to check them on yours, and `doctor --fix` to disable
+# any that your install does not list.
 #
 # Per model:
 #   id             exact value passed to --model (provider/model)
@@ -50,36 +51,28 @@ models:
     fallback_order: 1
     notes: "Zen stealth model built for coding agents; free while in preview."
 
-  - id: opencode/minimax-m2.5-free
+  - id: opencode/mimo-v2.6-flash-free
     provider: opencode-zen
-    tier: 4
-    good_for: [feature, tests, refactor, review, general]
+    tier: 3
+    good_for: [tests, review, ui, docs, general]
     status: active
     fallback_order: 2
-    notes: "Strong at coding and agentic tool use."
+    notes: "Fast; a good read-only cross-reviewer for Big Pickle's work."
 
-  - id: opencode/mimo-v2-pro-free
+  - id: opencode/nemotron-3-ultra-free
     provider: opencode-zen
-    tier: 3
-    good_for: [feature, tests, ui, general]
+    tier: 4
+    good_for: [analysis, complex-logic, review, general]
     status: active
     fallback_order: 3
+    notes: "Large context; good for surveys and reviews over lots of code."
 
-  - id: opencode/nemotron-3-super-free
+  - id: opencode/space-bunny-free
     provider: opencode-zen
     tier: 3
-    good_for: [analysis, docs, review, general]
+    good_for: [feature, refactor, mechanical, general]
     status: active
     fallback_order: 4
-    notes: "Very long context (~1M); good for reading lots of code."
-
-  - id: opencode/gpt-5-nano
-    provider: opencode-zen
-    tier: 1
-    good_for: [mechanical, docs]
-    avoid_for: [complex-logic, migration]
-    status: standby
-    fallback_order: 5
 
   # ── Examples from other providers (enable after `opencode auth login <provider>`
   #    and after checking the exact id in `opencode models`) ──

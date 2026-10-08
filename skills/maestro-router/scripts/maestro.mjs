@@ -3,10 +3,10 @@
 //
 //   maestro.mjs route    --type <t> [--sensitivity normal|sensitive] [--role implementer|reviewer] [--exclude-provider p]...
 //   maestro.mjs dispatch --brief <card.md> --out <dir> [--type t] [--sensitivity s] [--role r] [--read-only]
-//                        [--exclude-provider p]... [--exclude-model m]... [--agent a]... [--pin agent:model]
+//                        [--exclude-provider p]... [--avoid-provider p]... [--exclude-model m]... [--agent a]... [--pin agent:model]
 //                        [--session id] [--effort e] [--no-wait] [--cycle n] [--allow-dirty] [--dry-run] [--cd repo]
 //   maestro.mjs wait     --until <ISO time> [--max-minutes n]   (sleep until a cooldown ends; run in background)
-//   maestro.mjs doctor   [--json]
+//   maestro.mjs doctor   [--json] [--fix]   (--fix disables models your CLIs do not list, in YOUR config files only)
 //   maestro.mjs limits   [show | clear [key]]
 //   maestro.mjs init     --global | --project [--force]
 //   maestro.mjs config   (print the resolved config and agents)
@@ -19,10 +19,11 @@ import { spawnSync } from "node:child_process";
 import { loadConfig, DEFAULTS_DIR, gitRoot, globalConfigDir } from "./lib/config.mjs";
 import { readLimits, clearLimits, limitsPath } from "./lib/limits.mjs";
 import { rankCandidates } from "./lib/route.mjs";
+import { disableModelsInFile } from "./lib/fix-models.mjs";
 import { dispatch, findRelay, sleep, EXIT } from "./lib/dispatch.mjs";
 
-const MULTI = new Set(["exclude-provider", "exclude-model", "agent"]);
-const BOOL = new Set(["read-only", "no-wait", "allow-dirty", "dry-run", "json", "global", "project", "force", "help"]);
+const MULTI = new Set(["exclude-provider", "exclude-model", "avoid-provider", "agent"]);
+const BOOL = new Set(["read-only", "no-wait", "allow-dirty", "dry-run", "json", "global", "project", "force", "help", "verbose", "fix"]);
 
 function parseArgs(argv) {
   const out = { _: [] };
@@ -86,15 +87,18 @@ switch (cmd) {
       role,
       excludeProviders: args["exclude-provider"],
       excludeModels: args["exclude-model"],
+      avoidProviders: args["avoid-provider"],
       agents: args.agent ?? roleCfg.agents,
+      models: roleCfg.models,
       minTier: roleCfg.min_tier,
     };
     const { candidates, skipped, minTier } = rankCandidates(agents, task, { routing: config.routing, limits: readLimits() });
     print({
       task,
       minTier,
-      chain: candidates.map((c, i) => ({ rank: i + 1, ref: c.ref, provider: c.model.provider, tier: c.model.tier, fit: c.fit, standby: !!c.standby })),
-      skipped,
+      chain: candidates.map((c, i) => ({ rank: i + 1, ref: c.ref, provider: c.model.provider, tier: c.model.tier, fit: c.fit, standby: !!c.standby, avoided: !!c.avoided })),
+      // Skipped models are NOT in the chain; listed only with --verbose to avoid misreading.
+      ...(args.verbose ? { skipped } : { skippedCount: skipped.length, note: "models not in `chain` are never used; add --verbose to see why each was skipped" }),
     });
     break;
   }
@@ -114,6 +118,7 @@ switch (cmd) {
       readOnly: !!args["read-only"],
       excludeProviders: args["exclude-provider"],
       excludeModels: args["exclude-model"],
+      avoidProviders: args["avoid-provider"],
       agents: args.agent,
       pin: args.pin,
       session: args.session,
@@ -190,9 +195,18 @@ switch (cmd) {
       for (const m of a.models) {
         entry.models.push({ id: m.id, status: m.status, tier: m.tier, available: listing === null ? "unknown" : listing.includes(m.id) });
       }
+      const missing = entry.models.filter((m) => m.available === false && m.status !== "disabled").map((m) => m.id);
+      if (args.fix && missing.length) {
+        if (["project", "global", "env", "explicit"].includes(sources.agentsScope) && !a.pack) {
+          entry.fixed = disableModelsInFile(a.file, missing, `not listed by "${a.list_models_cmd}"`);
+          for (const m of entry.models) if (entry.fixed.includes(m.id)) m.status = "disabled (fixed)";
+        } else {
+          report.problems.push(`${a.agent}: cannot --fix shipped files (${a.file}); run \`maestro.mjs init --project\` (or --global) first, then doctor --fix`);
+        }
+      }
       if (a.enabled && !entry.binary) report.problems.push(`${a.agent}: binary "${a.binary}" not on PATH (disable it in ${a.file} or install it)`);
       if (a.enabled && !relay) report.problems.push(`${a.agent}: ${a.delegate_skill} not found — install delegate-skills: npx skills add amElnagdy/delegate-skills`);
-      for (const m of entry.models) if (m.available === false && m.status !== "disabled") report.problems.push(`${a.agent}: model ${m.id} not in "${a.list_models_cmd}" output — fix the id or set status: disabled`);
+      for (const m of entry.models) if (m.available === false && m.status !== "disabled" && m.status !== "disabled (fixed)") report.problems.push(`${a.agent}: model ${m.id} not in "${a.list_models_cmd}" output — fix the id or set status: disabled`);
       report.agents.push(entry);
     }
     const root = gitRoot();
@@ -207,6 +221,8 @@ switch (cmd) {
         for (const m of a.models) lines.push(`    ${m.available === true ? "✓" : m.available === false ? "✗" : "?"} ${m.id}  tier ${m.tier}  ${m.status}`);
       }
       lines.push("", `speckit: cli=${report.speckit.cli ? "ok" : "missing"} project=${report.speckit.project_initialized ? "initialized" : "not initialized"}`);
+      const fixed = report.agents.flatMap((a) => (a.fixed ?? []).map((id) => `${a.agent}:${id}`));
+      if (fixed.length) lines.push("", `Fixed (set status: disabled): ${fixed.join(", ")}`);
       lines.push("", report.problems.length ? "Problems:\n- " + report.problems.join("\n- ") : "No problems found.");
       process.stdout.write(lines.join("\n") + "\n");
     }

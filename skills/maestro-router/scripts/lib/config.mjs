@@ -51,7 +51,8 @@ export const BUILTIN_DEFAULTS = {
   on_exhaustion: "ask",
   wait_and_retry: { max_wait_minutes: 120, max_cycles: 3 },
   routing: { sensitive_min_tier: 4, normal_min_tier: 1, reviewer_min_tier: 3, prefer_cheapest_sufficient: true, allow_unfit_fallback: false },
-  dispatch: { max_model_switches: 6, default_timeout: "45m" },
+  dispatch: { max_model_switches: 6, default_timeout: "45m", infra_retries: 2, infra_backoff_seconds: 20 },
+  git: { commit: "per_card" },
   state: { dir: ".workflow" },
 };
 
@@ -135,6 +136,10 @@ export function normalizeAgent(a, file = "(inline)") {
       String(s).toLowerCase(),
     ),
     limit_scope: a.limit_scope ?? "provider",
+    // Relay output meaning "the CLI never ran" (not the model's fault): retried on the same model.
+    infra_signals: (a.infra_signals ?? ["was not dispatched", "preflight timed out", "etimedout", "econnreset", "socket hang up"]).map((s) =>
+      String(s).toLowerCase(),
+    ),
     cooldown_minutes: Number(a.cooldown_minutes ?? 60),
     models,
   };

@@ -38,7 +38,7 @@ Use `references/decision-template.md`. Each decision needs:
 - **2–4 real options.** Include "minimal / defer" when that is valid.
 - For each option: pros, cons, effort (S/M/L), risk, and its effect on the plan.
 - **A recommendation (⭐)** with the expert reasoning, and what would change your mind.
-- **A default if unanswered**, clearly labeled.
+- **No silent default.** An unanswered decision is never applied, not even the recommended option. The work that depends on it waits.
 
 Order the decisions by impact, blocking ones first. Keep the list short. More than about 7
 means you should decide the minor ones yourself and list them under **Assumptions** for a quick veto.
@@ -56,6 +56,12 @@ Code), you may use it **in addition to** the written analysis, never instead of 
 
 Save everything to `decisions.md`, set `status.md` to "2-Decisions (WAITING ON USER)", and
 **end your turn**. Do not keep working in the meantime.
+
+## Unanswered means not approved
+If the user replies without addressing a decision, or the answer is ambiguous:
+- Do **not** pick an option for them, not even the recommended one, and not because it is "least surprising" or "easy to change later".
+- Continue only with work that does not depend on the open decision. Ask again, briefly, for just the open ones.
+- The only exception is an explicit instruction such as "use your recommendations", "approve all", or "decide yourself". Record it as `APPROVED (delegated by user)`.
 
 ## 5. After the answer
 - Record each answer: `APPROVED`, `CHANGED → B`, `DEFERRED`, or `CUSTOM: …`. "ok" / "approve" / "approve all" (or the equivalent in the user's language) means every recommendation is approved.

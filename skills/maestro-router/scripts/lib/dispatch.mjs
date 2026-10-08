@@ -6,7 +6,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { spawnSync, execFileSync } from "node:child_process";
 import { SKILLS_ROOT, gitRoot } from "./config.mjs";
-import { readLimits, markLimited, looksLimited } from "./limits.mjs";
+import { readLimits, markLimited, looksLimited, looksInfra } from "./limits.mjs";
 import { rankCandidates, earliestRecovery } from "./route.mjs";
 
 export const EXIT = { OK: 0, USAGE: 2, FAILED: 3, EXHAUSTED: 4, STOPPED: 5, RETRY_LATER: 6 };
@@ -104,7 +104,9 @@ export function dispatch(opts) {
     role,
     excludeProviders: opts.excludeProviders ?? [],
     excludeModels: opts.excludeModels ?? [],
+    avoidProviders: opts.avoidProviders ?? [],
     agents: opts.agents?.length ? opts.agents : roleCfg.agents,
+    models: roleCfg.models,
     minTier: roleCfg.min_tier,
   };
   const routing = config.routing ?? {};
@@ -112,6 +114,10 @@ export function dispatch(opts) {
   const policy = config.on_exhaustion ?? "ask";
   const war = config.wait_and_retry ?? {};
   const attempts = [];
+  const infraRetries = Number(config.dispatch?.infra_retries ?? 2);
+  const infraBackoffS = Number(config.dispatch?.infra_backoff_seconds ?? 20);
+  // Model switches exclude same-model infrastructure retries.
+  const switches = () => attempts.filter((a) => a.outcome !== "infra_retry").length;
   const unavailableAgents = new Set(); // CLI missing / relay missing: skip the agent's other models
   let cycles = Number(opts.cycle ?? 0);
 
@@ -156,8 +162,8 @@ export function dispatch(opts) {
     }
 
     for (const c of candidates) {
-      if (attempts.length >= maxSwitches) break;
-      if (attempts.some((a) => a.ref === c.ref)) continue;
+      if (switches() >= maxSwitches) break;
+      if (attempts.some((a) => a.ref === c.ref && a.outcome !== "infra_retry")) continue;
       if (unavailableAgents.has(c.agent.agent)) continue;
       const relay = findRelay(c.agent.delegate_skill, cd);
       if (!relay) {
@@ -165,19 +171,30 @@ export function dispatch(opts) {
         attempts.push({ ref: c.ref, outcome: "no_relay", detail: `${c.agent.delegate_skill} not installed (npx skills add amElnagdy/delegate-skills)` });
         continue;
       }
-      const outDir = join(out, `attempt-${attempts.length + 1}`);
-      mkdirSync(outDir, { recursive: true });
       // A session id belongs to one agent/model: only resume it on the pinned candidate.
       const isPinned = !!opts.pin && (c.ref === opts.pin || c.model.id === opts.pin);
       const session = opts.session && (isPinned || !opts.pin) ? opts.session : undefined;
-      const args = buildRelayArgs({ agent: c.agent, model: c.model, brief: opts.brief, cd, outDir, effort, readOnly: opts.readOnly, session, timeout: c.agent.timeout ?? config.dispatch?.default_timeout });
-      log(`maestro: dispatching to ${c.ref} (tier ${c.model.tier}, provider ${c.model.provider})`);
-      const run = spawnSync(process.execPath, [relay, ...args], { cwd: cd, stdio: ["ignore", "pipe", "pipe"], maxBuffer: 64 * 1024 * 1024 });
-      writeFileSync(join(outDir, "relay.stdout.txt"), run.stdout ?? "");
-      writeFileSync(join(outDir, "relay.stderr.txt"), run.stderr ?? "");
-      const resultPath = join(outDir, "result.json");
-      const result = existsSync(resultPath) ? JSON.parse(readFileSync(resultPath, "utf8")) : null;
-      const entry = { ref: c.ref, agent: c.agent.agent, model: c.model.id, provider: c.model.provider, tier: c.model.tier, resultPath, status: result?.status ?? "no_result", exitCode: run.status };
+      let run, result, resultPath, entry;
+      for (let infraTry = 0; ; infraTry++) {
+        const outDir = join(out, `attempt-${attempts.length + 1}`);
+        mkdirSync(outDir, { recursive: true });
+        const args = buildRelayArgs({ agent: c.agent, model: c.model, brief: opts.brief, cd, outDir, effort, readOnly: opts.readOnly, session, timeout: c.agent.timeout ?? config.dispatch?.default_timeout });
+        log(`maestro: dispatching to ${c.ref} (tier ${c.model.tier}, provider ${c.model.provider})`);
+        run = spawnSync(process.execPath, [relay, ...args], { cwd: cd, stdio: ["ignore", "pipe", "pipe"], maxBuffer: 64 * 1024 * 1024 });
+        writeFileSync(join(outDir, "relay.stdout.txt"), run.stdout ?? "");
+        writeFileSync(join(outDir, "relay.stderr.txt"), run.stderr ?? "");
+        resultPath = join(outDir, "result.json");
+        result = existsSync(resultPath) ? JSON.parse(readFileSync(resultPath, "utf8")) : null;
+        entry = { ref: c.ref, agent: c.agent.agent, model: c.model.id, provider: c.model.provider, tier: c.model.tier, resultPath, status: result?.status ?? "no_result", exitCode: run.status };
+        // The CLI never ran (e.g. its version check timed out on a loaded machine): same model again.
+        if (looksInfra(c.agent, result) && infraTry < infraRetries) {
+          attempts.push({ ...entry, outcome: "infra_retry", detail: String(result.error ?? result.stderrTail ?? "").slice(-400) });
+          log(`maestro: ${c.ref} was not started (${result.error ?? "infrastructure"}); retrying in ${infraBackoffS}s`);
+          sleep(infraBackoffS * 1000);
+          continue;
+        }
+        break;
+      }
 
       if (result && result.status === "completed" && !looksLimited(c.agent, result)) {
         attempts.push({ ...entry, outcome: "completed" });
@@ -234,10 +251,10 @@ export function dispatch(opts) {
     const limitsNow = readLimits();
     const remaining = rankCandidates(agentsList, task, { routing, limits: limitsNow }).candidates
       .filter((c) => !attempts.some((a) => a.ref === c.ref) && !unavailableAgents.has(c.agent.agent));
-    if (remaining.length && attempts.length < maxSwitches) continue;
+    if (remaining.length && switches() < maxSwitches) continue;
 
     const retryAfter = earliestRecovery(agentsList, task, { routing, limits: limitsNow });
-    const allFailedHard = attempts.length > 0 && attempts.every((a) => ["failed", "no_relay", "agent_unavailable"].includes(a.outcome));
+    const allFailedHard = attempts.length > 0 && attempts.every((a) => ["failed", "no_relay", "agent_unavailable", "infra_retry"].includes(a.outcome));
 
     if (allFailedHard) {
       return finish(out, { status: "failed", reason: "every candidate failed for non-limit reasons", attempts }, EXIT.FAILED);

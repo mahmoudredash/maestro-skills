@@ -119,11 +119,15 @@ The default files list the best-known free models at the time of writing:
 
 | Agent | Models |
 |---|---|
-| opencode | OpenCode Zen free models: `big-pickle`, `minimax-m2.5-free`, `mimo-v2-pro-free`, `nemotron-3-super-free`, `gpt-5-nano` |
-| pi | Zen models through pi, plus free Ollama Cloud and OpenRouter models (requires `pi install npm:pi-free`) |
+| opencode | OpenCode Zen free models (confirmed on a real install, 2026-10): `big-pickle`, `mimo-v2.6-flash-free`, `nemotron-3-ultra-free`, `space-bunny-free` |
+| pi | **Examples only, shipped disabled.** pi's ids depend on your providers and extensions (`pi install npm:pi-free`). Put the ids from `pi --list-models` in and enable them |
 | cmd | `ling-3.1-flash:free`, `laguna-s-2.1-free`, `space-bunny-alpha`, `ling-3.0-flash-sante:free` |
 
-⚠️ Free model names change often. **Run `doctor`** after installing, and adjust the files to your accounts.
+⚠️ Free model names change often. **Run `doctor`** after installing. `doctor --fix` disables any model your CLIs don't list. It only edits your own config files, so run `init` first.
+
+**Pinning a project to exact models** (for example "only Big Pickle implements, only Mimo reviews"): use the per-role `models` allowlist. See `skills/maestro-router/SKILL.md` → "Pinning a role to exact models".
+
+**What to commit:** commit `.maestro/` (the project's routing rules). Commit `.workflow/` too if `state.commit_state` is true. Usage limits live in `~/.config/maestro/state/` and are never committed.
 
 ### How a model is chosen
 1. **Filtering:** a model is dropped if it is `disabled`, in a cooldown, below the minimum `tier`, or not suited to the task type.
